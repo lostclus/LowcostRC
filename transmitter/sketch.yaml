@@ -1,0 +1,2 @@
+default_port: /dev/ttyUSB0
+default_fqbn: arduino:avr:pro:cpu=8MHzatmega328
