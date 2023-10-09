@@ -19,12 +19,17 @@
 #define VOLT_METER_R2 10000L
 
 #define PIPE_ADDRESS_ROM_ADDR 0
-#define NO_CONTROL_ROM_ADDR 7
+#define NOLINK_ROM_ADDR 7
 
 #define ENGINE_OFF_THRESHOLD 1200
 #define ENGINE_ON_THRESHOLD 1650
 #define ENGINE_POWER_MIN 1200
 #define ENGINE_POWER_MAX 2400
+
+const ControlPacket DEFAULT_NOLINK_CONTROL = {
+  PACKET_TYPE_CONTROL,
+  {1500, 1500, 1500, 1500}
+};
 
 bool engineOn = false;
 unsigned int battaryMV = 0;
@@ -82,15 +87,13 @@ void setup(void) {
 
   controlTime = 0;
   sendStatusTime = 0;
-
-  channel1Servo.writeMicroseconds(1500);
-  channel2Servo.writeMicroseconds(1500);
-  analogWrite(CHANNEL3_PIN, 0);
 }
 
 void loop(void) {
   unsigned long now = millis();
-  union RequestPacket packet;
+  union RequestPacket rp;
+  static int lastChannels[NUM_CHANNELS];
+  static bool hasLastChannels = false;
 
   if (now - sendStatusTime > 5000) {
     sendStatus();
@@ -98,42 +101,53 @@ void loop(void) {
   }
 
   if (radio.available()) {
-    radio.read(&packet, sizeof(packet));
-    if (packet.generic.packetType == PACKET_TYPE_CONTROL) {
+    radio.read(&rp, sizeof(rp));
+    if (rp.generic.packetType == PACKET_TYPE_CONTROL) {
       controlTime = now;
+
+      for (int channel = 0; channel < NUM_CHANNELS; channel++)
+        lastChannels[channel] = rp.control.channels[channel];
+      hasLastChannels = true;
 
       #ifdef WITH_CONSOLE
       if (now / 1000 % 2 == 0) {
         PRINT(F("ch1: "));
-        PRINT(packet.control.channels[CHANNEL1]);
+        PRINT(rp.control.channels[CHANNEL1]);
         PRINT(F(", "));
         PRINT(F("ch2: "));
-        PRINT(packet.control.channels[CHANNEL2]);
+        PRINT(rp.control.channels[CHANNEL2]);
         PRINT(F(", "));
         PRINT(F("ch3: "));
-        PRINTLN(packet.control.channels[CHANNEL3]);
+        PRINTLN(rp.control.channels[CHANNEL3]);
       }
       #endif
 
-      applyControl(&packet.control);
-    } else if (packet.generic.packetType == PACKET_TYPE_SET_PIPE_ADDRESS) {
-      radio.openReadingPipe(1, (byte*)packet.address.pipeAddress);
+      applyControl(&rp.control);
+    } else if (rp.generic.packetType == PACKET_TYPE_SET_PIPE_ADDRESS) {
+      radio.openReadingPipe(1, (byte*)rp.address.pipeAddress);
       PRINT(F("New radio pipe address: "));
-      PRINTLN(packet.address.pipeAddress);
-      EEPROM.put(PIPE_ADDRESS_ROM_ADDR, packet.address.pipeAddress);
+      PRINTLN(rp.address.pipeAddress);
+      EEPROM.put(PIPE_ADDRESS_ROM_ADDR, rp.address.pipeAddress);
+    } else if (rp.generic.packetType == PACKET_TYPE_COMMAND) {
+      if (rp.command.command == COMMAND_SAVE_FOR_NOLINK && hasLastChannels) {
+        PRINT(F("Saving state for no link"));
+        rp.control.packetType = PACKET_TYPE_CONTROL;
+        for (int channel = 0; channel < NUM_CHANNELS; channel++)
+          rp.control.channels[channel] = lastChannels[channel];
+        EEPROM.put(NOLINK_ROM_ADDR, rp.control);
+      }
     }
   }
 
   if (controlTime > 0 && now - controlTime > 1250) {
     PRINTLN(F("Radio signal lost"));
-    EEPROM.get(NO_CONTROL_ROM_ADDR, packet.control);
+    EEPROM.get(NOLINK_ROM_ADDR, rp.control);
 
-    if (packet.control.packetType != PACKET_TYPE_CONTROL) {
-      packet.control.channels[CHANNEL1] = 0;
-      packet.control.channels[CHANNEL2] = 0;
-      packet.control.channels[CHANNEL3] = 0;
+    if (rp.control.packetType == PACKET_TYPE_CONTROL) {
+      applyControl(&rp.control);
+    } else {
+      applyControl(&DEFAULT_NOLINK_CONTROL);
     }
-    applyControl(&packet.control);
   }
 }
 

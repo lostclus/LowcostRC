@@ -130,6 +130,7 @@ enum Screen {
   SCREEN_CHANNEL_A_Y,
   SCREEN_CHANNEL_B_X,
   SCREEN_CHANNEL_B_Y,
+  SCREEN_SAVE_FOR_NOLINK,
   SCREEN_SAVE,
   FIRST_SCREEN = NO_SCREEN,
   LAST_SCREEN = SCREEN_SAVE,
@@ -184,6 +185,7 @@ void saveProfile();
 char *formatPipeAddress(int pipeAddressN);
 void setPipeAddress(int pipeAddressN);
 void sendPipeAddress(unsigned long now, int pipeAddressN);
+void sendCommand(unsigned long now);
 void controlLoop(unsigned long now);
 int readAxis(Axis axis);
 void setJoystickCenter();
@@ -299,6 +301,13 @@ void sendPipeAddress(unsigned long now, int pipeAddressN) {
   union RequestPacket rp;
   rp.address.packetType = PACKET_TYPE_SET_PIPE_ADDRESS;
   strcpy(rp.address.pipeAddress, pipeAddress);
+  sendRequest(now, &rp);
+}
+
+void sendCommand(unsigned long now, Command command) {
+  union RequestPacket rp;
+  rp.command.packetType = PACKET_TYPE_COMMAND;
+  rp.command.command = command;
   sendRequest(now, &rp);
 }
 
@@ -625,6 +634,12 @@ void redrawScreen() {
         );
       }
       break;
+    case SCREEN_SAVE_FOR_NOLINK:
+      sprintf_P(
+        text,
+        PSTR("Save for\nno link?")
+      );
+      break;
     case SCREEN_SAVE:
       sprintf_P(
         text,
@@ -676,6 +691,13 @@ void controlScreen(unsigned long now) {
 
   if (settingsValueChange != 0) {
     switch (screenNum) {
+      case NO_SCREEN:
+        sendCommand(
+          now,
+          (settingsValueChange > 0) ?
+          COMMAND_USER_COMMAND1 : COMMAND_USER_COMMAND2
+        );
+        break;
       case SCREEN_PROFILE:
         addWithConstrain(
           currentProfile, settingsValueChange, 0, NUM_PROFILES - 1
@@ -739,6 +761,13 @@ void controlScreen(unsigned long now) {
           NUM_CHANNELS - 1
         );
         break;
+      case SCREEN_SAVE_FOR_NOLINK:
+        if (settingsValueChange > 0) {
+          sendCommand(now, COMMAND_SAVE_FOR_NOLINK);
+          beepCount = 1;
+          beepDuration = 250;
+        }
+        break;
       case SCREEN_SAVE:
         screenNum = NO_SCREEN;
         if (settingsValueChange > 0) {
@@ -746,6 +775,7 @@ void controlScreen(unsigned long now) {
           beepCount = 1;
           beepDuration = 500;
         }
+        break;
     }
     redrawScreen();
   }
