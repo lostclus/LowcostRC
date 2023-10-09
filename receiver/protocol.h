@@ -1,4 +1,4 @@
-const char DEFAULT_PIPE_ADDR[] = "lcrc00";
+const char DEFAULT_PIPE_ADDR[] = "lcrc0";
 const size_t PACKET_SIZE = 16;
 
 enum PacketType {
@@ -39,7 +39,7 @@ struct StatusPacket{
 
 struct SetAddressPacket{
   PacketType packetType;
-  char pipeAddress[7];
+  char pipeAddress[6];
 };
 
 struct CommandPacket{

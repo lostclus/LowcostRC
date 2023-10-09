@@ -284,8 +284,8 @@ void saveProfile() {
 }
 
 char *formatPipeAddress(int pipeAddressN) {
-  static char addr[7];
-  sprintf_P(addr, PSTR("lcrc%02d"), pipeAddressN);
+  static char addr[6];
+  sprintf_P(addr, PSTR("lcrc%01d"), pipeAddressN);
   return addr;
 }
 
@@ -703,6 +703,7 @@ void controlScreen(unsigned long now) {
           currentProfile, settingsValueChange, 0, NUM_PROFILES - 1
         );
         loadProfile();
+        setPipeAddress(settings.pipeAddressN);
         break;
       case SCREEN_PIPE_ADDRESS:
         addWithConstrain(
