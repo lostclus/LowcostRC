@@ -4,22 +4,15 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <AbleButtons.h>
 
 #include "protocol.h"
 
 #undef WITH_CONSOLE
 #define WITH_CONSOLE
 
-#ifdef WITH_DISPLAY
-#include "bitmaps.h"
-#endif
-
 #define RADIO_CE_PIN 9
 #define RADIO_CSN_PIN 10
-
-#define ENGINE_OFF 0
-#define ENGINE_MIN 20
-#define ENGINE_MAX 255
 
 #define BEEP_PIN 3
 #define BEEP_FREQ 1320
@@ -31,74 +24,82 @@
 #define VOLT_METER_R1 10000L
 #define VOLT_METER_R2 10000L
 
-#define SETTINGS_MAGICK 0x5555
+#define SETTINGS_MAGICK 0x5556
 #define PROFILES_ADDR 0
 #define NUM_PROFILES 5
 
-enum JoystickAxis {
-  JOYSTICK_A_X,
-  JOYSTICK_A_Y,
-  JOYSTICK_B_X,
-  JOYSTICK_B_Y,
-  JOYSTICK_AXES_COUNT,
+enum Axis {
+  AXIS_A_X,
+  AXIS_A_Y,
+  AXIS_B_X,
+  AXIS_B_Y,
+  AXES_COUNT,
 };
 
 int joystickPins[] = {A1, A0, A3, A2};
 
-struct JoystickAxisSettings {
-  int center,
-      threshold,
-      dualRate,
+struct AxisSettings {
+  int joyCenter,
+      joyThreshold;
+  bool joyInvert;
+  int dualRate,
       trimming;
-  bool invert;
+  ChannelN channel;
 };
 
 struct Settings {
   int magick;
-  JoystickAxisSettings joystick[JOYSTICK_AXES_COUNT];
+  int pipeAddressN;
+  AxisSettings axes[AXES_COUNT];
 };
 
-const int JOYSTICK_LOGICAL_MAX = 16000,
-          DEFAULT_CENTER = 512,
-          DEFAULT_THRESHOLD = 1,
-          DEFAULT_DUAL_RATE = 16000,
+const int DEFAULT_PIPE_ADDRESS_N = 0,
+          DEFAULT_JOY_CENTER = 512,
+          DEFAULT_JOY_THRESHOLD = 1;
+const bool DEFAULT_JOY_INVERT = false;
+const int CENTER_PULSE = 1500,
+          DEFAULT_DUAL_RATE = 900,
           DEFAULT_TRIMMING = 0,
-          DUAL_RATE_MIN = 500,
-          DUAL_RATE_MAX = 16000,
-          TRIMMING_MIN = -8000,
-          TRIMMING_MAX = 8000;
-const bool DEFAULT_INVERT = false;
+          DUAL_RATE_MIN = 10,
+          DUAL_RATE_MAX = 1500,
+          TRIMMING_MIN = -1500,
+          TRIMMING_MAX = 1500;
 
 const Settings defaultSettings PROGMEM = {
   SETTINGS_MAGICK,
+  DEFAULT_PIPE_ADDRESS_N,
   {
     {
-      DEFAULT_CENTER,
-      DEFAULT_THRESHOLD,
+      DEFAULT_JOY_CENTER,
+      DEFAULT_JOY_THRESHOLD,
+      DEFAULT_JOY_INVERT,
       DEFAULT_DUAL_RATE,
       DEFAULT_TRIMMING,
-      DEFAULT_INVERT
+      CHANNEL1
     },
     {
-      DEFAULT_CENTER,
-      DEFAULT_THRESHOLD,
+      DEFAULT_JOY_CENTER,
+      DEFAULT_JOY_THRESHOLD,
+      DEFAULT_JOY_INVERT,
       DEFAULT_DUAL_RATE,
       DEFAULT_TRIMMING,
-      DEFAULT_INVERT
+      CHANNEL2
     },
     {
-      DEFAULT_CENTER,
-      DEFAULT_THRESHOLD,
+      DEFAULT_JOY_CENTER,
+      DEFAULT_JOY_THRESHOLD,
+      DEFAULT_JOY_INVERT,
       DEFAULT_DUAL_RATE,
       DEFAULT_TRIMMING,
-      DEFAULT_INVERT
+      CHANNEL3
     },
     {
-      DEFAULT_CENTER,
-      DEFAULT_THRESHOLD,
+      DEFAULT_JOY_CENTER,
+      DEFAULT_JOY_THRESHOLD,
+      DEFAULT_JOY_INVERT,
       DEFAULT_DUAL_RATE,
       DEFAULT_TRIMMING,
-      DEFAULT_INVERT
+      CHANNEL4
     }
   }
 };
@@ -111,6 +112,7 @@ enum Screen {
   NO_SCREEN,
   SCREEN_BATTARY,
   SCREEN_PROFILE,
+  SCREEN_PIPE_ADDRESS,
   SCREEN_AUTO_CENTER,
   SCREEN_DUAL_RATE_A_X,
   SCREEN_DUAL_RATE_A_Y,
@@ -124,6 +126,10 @@ enum Screen {
   SCREEN_INVERT_A_Y,
   SCREEN_INVERT_B_X,
   SCREEN_INVERT_B_Y,
+  SCREEN_CHANNEL_A_X,
+  SCREEN_CHANNEL_A_Y,
+  SCREEN_CHANNEL_B_X,
+  SCREEN_CHANNEL_B_Y,
   SCREEN_SAVE,
   FIRST_SCREEN = NO_SCREEN,
   LAST_SCREEN = SCREEN_SAVE,
@@ -133,25 +139,35 @@ unsigned int thisBattaryMV = 0;
 
 unsigned long requestSendTime = 0,
               errorTime = 0,
-              settingsPressTime = 0,
-              settingsPlusPressTime = 0,
-              settingsMinusPressTime = 0,
               beepTime = 0,
               battaryUpdateTime = 0;
 bool statusRadioSuccess = false,
      statusRadioFailure = false,
-     settingsPress = false,
-     settingsPlusPress = false,
-     settingsMinusPress = false,
      beepState = false,
-     engineOn = false;
+     settingsLongPress = false;
 int beepDuration = 0,
     beepPause = 0,
     beepCount = 0;
 Screen screenNum = NO_SCREEN;
 
+struct StatusPacket status;
+
 RF24 radio(RADIO_CE_PIN, RADIO_CSN_PIN);
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
+
+using Button = AblePullupClickerButton;
+using ButtonList = AblePullupClickerButtonList;
+
+Button settingsButton(SETTINGS_PIN),
+       settingsPlusButton(SETTINGS_PLUS_PIN),
+       settingsMinusButton(SETTINGS_MINUS_PIN);
+
+Button *buttonsArray[] = {
+  &settingsButton,
+  &settingsPlusButton,
+  &settingsMinusButton
+};
+ButtonList buttons(buttonsArray);
 
 #ifdef WITH_CONSOLE
 #define PRINT(x) Serial.print(x)
@@ -165,8 +181,11 @@ Adafruit_SSD1306 display(128, 64, &Wire, -1);
 
 bool loadProfile();
 void saveProfile();
+char *formatPipeAddress(int pipeAddressN);
+void setPipeAddress(int pipeAddressN);
+void sendPipeAddress(unsigned long now, int pipeAddressN);
 void controlLoop(unsigned long now);
-int readJoystickAxis(JoystickAxis axis);
+int readAxis(Axis axis);
 void setJoystickCenter();
 void updateBattaryVoltage();
 void controlBeep(unsigned long now);
@@ -176,19 +195,22 @@ void controlScreen(unsigned long now);
 void setup(void)
 {
   bool needsSetJoystickCenter = false;
+  char *pipeAddress;
 
   #ifdef WITH_CONSOLE
   Serial.begin(115200);
   #endif
   PRINTLN(F("Starting..."));
 
-  for (int axis = 0; axis < JOYSTICK_AXES_COUNT; axis++) {
+  for (int axis = 0; axis < AXES_COUNT; axis++) {
     pinMode(joystickPins[axis], INPUT);
   }
 
-  pinMode(SETTINGS_PIN, INPUT_PULLUP);
-  pinMode(SETTINGS_PLUS_PIN, INPUT_PULLUP);
-  pinMode(SETTINGS_MINUS_PIN, INPUT_PULLUP);
+  buttons.begin();
+  settingsButton.setDebounceTime(20);
+  settingsPlusButton.setDebounceTime(20);
+  settingsMinusButton.setDebounceTime(20);
+
   pinMode(BEEP_PIN, OUTPUT);
 
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
@@ -204,18 +226,14 @@ void setup(void)
     PRINTLN("Radio init: FAILURE");
   }
   radio.setRadiation(RF24_PA_MAX, RF24_250KBPS);
-  radio.setPayloadSize(16);
+  radio.setPayloadSize(PACKET_SIZE);
   radio.enableAckPayload();
-  radio.openWritingPipe(RADIO_PIPE);
+
+  setPipeAddress(settings.pipeAddressN);
 
   if (needsSetJoystickCenter) {
     setJoystickCenter();
   }
-
-  request.magick = MAGICK;
-  request.alerons = 0;
-  request.elevator = 0;
-  request.engine = 0;
 }
 
 void loop(void) {
@@ -263,56 +281,72 @@ void saveProfile() {
   EEPROM.put(PROFILES_ADDR + currentProfile * SETTINGS_SIZE, settings);
 }
 
+char *formatPipeAddress(int pipeAddressN) {
+  static char addr[7];
+  sprintf_P(addr, PSTR("lcrc%02d"), pipeAddressN);
+  return addr;
+}
+
+void setPipeAddress(int pipeAddressN) {
+  char *pipeAddress = formatPipeAddress(settings.pipeAddressN);
+  radio.openWritingPipe((byte*)pipeAddress);
+  PRINT(F("Radio pipe address: "));
+  PRINTLN(pipeAddress);
+}
+
+void sendPipeAddress(unsigned long now, int pipeAddressN) {
+  char *pipeAddress = formatPipeAddress(settings.pipeAddressN);
+  union RequestPacket rp;
+  rp.address.packetType = PACKET_TYPE_SET_PIPE_ADDRESS;
+  strcpy(rp.address.pipeAddress, pipeAddress);
+  sendRequest(now, &rp);
+}
+
 void controlLoop(unsigned long now) {
-  bool isChanged;
-  int prevAlerons = request.alerons,
-      prevElevator = request.elevator;
-  byte prevEngine = request.engine;
+  union RequestPacket rp;
+  bool isChanged = false;
+  static int prevChannels[NUM_CHANNELS];
 
-  request.alerons = readJoystickAxis(JOYSTICK_B_X);
-  request.elevator = readJoystickAxis(JOYSTICK_B_Y);
+  rp.control.packetType = PACKET_TYPE_CONTROL;
 
-  int joyAY = readJoystickAxis(JOYSTICK_A_Y),
-      engineToogleThreshold  = settings.joystick[JOYSTICK_A_Y].dualRate / 4;
-  if (engineOn) {
-    if (joyAY < -engineToogleThreshold) {
-      engineOn = false;
-      request.engine = ENGINE_OFF;
-    } else {
-      request.engine = map(max(0, joyAY), 0, JOYSTICK_LOGICAL_MAX, ENGINE_MIN, ENGINE_MAX);
+  for (int channel = 0; channel < NUM_CHANNELS; channel++)
+    rp.control.channels[channel] = 0;
+  for (int axis = 0; axis < AXES_COUNT; axis++) {
+    ChannelN channel = settings.axes[axis].channel;
+    if (channel != NO_CHANNEL) {
+      rp.control.channels[channel] = readAxis(axis);
     }
-  } else if (joyAY > engineToogleThreshold) {
-    engineOn = true;
-    request.engine = ENGINE_MIN;
   }
 
-  isChanged = (
-    request.alerons != prevAlerons
-    || request.elevator != prevElevator
-    || request.engine != prevEngine
-  );
+  for (int channel = 0; channel < NUM_CHANNELS; channel++)
+    isChanged = isChanged || rp.control.channels[channel] != prevChannels[channel];
+
+  for (int channel = 0; channel < NUM_CHANNELS; channel++)
+    prevChannels[channel] = rp.control.channels[channel];
 
   if (
     isChanged
     || (requestSendTime > 0 && now - requestSendTime > 1000)
     || (errorTime > 0 && now - errorTime < 200)
   ) {
-    PRINT(F("alerons: "));
-    PRINT(request.alerons);
-    PRINT(F("; elevator: "));
-    PRINT(request.elevator);
-    PRINT(F("; engine: "));
-    PRINT(request.engine);
+    PRINT(F("ch1: "));
+    PRINT(rp.control.channels[CHANNEL1]);
+    PRINT(F("; ch2: "));
+    PRINT(rp.control.channels[CHANNEL2]);
+    PRINT(F("; ch3: "));
+    PRINT(rp.control.channels[CHANNEL3]);
+    PRINT(F("; ch4: "));
+    PRINTLN(rp.control.channels[CHANNEL4]);
 
-    sendRequest(now);
+    sendRequest(now, &rp);
   }
 
   if (radio.isAckPayloadAvailable()) {
-    radio.read(&response, sizeof(response));
-    if (response.magick == MAGICK) {
+    radio.read(&status, sizeof(status));
+    if (status.packetType == PACKET_TYPE_STATUS) {
       PRINT(F("battaryMV: "));
-      PRINTLN(response.battaryMV);
-      if (response.battaryMV < 3400) {
+      PRINTLN(status.battaryMV);
+      if (status.battaryMV < 3400) {
         beepCount = 3;
         beepDuration = 200;
         beepPause = 100;
@@ -321,12 +355,17 @@ void controlLoop(unsigned long now) {
   }
 }
 
-void sendRequest(unsigned long now) {
+void sendRequest(unsigned long now, union RequestPacket *packet) {
   static bool prevStatusRadioSuccess = false,
               prevStatusRadioFailure = false;
   bool radioOK, isStatusChanged;
 
-  radioOK = radio.write(&request, sizeof(request));
+  PRINT(F("Sending packet type: "));
+  PRINT(packet->generic.packetType);
+  PRINT(F("; size: "));
+  PRINTLN(sizeof(*packet));
+
+  radioOK = radio.write(packet, sizeof(*packet));
   if (radioOK) {
     requestSendTime = now;
     errorTime = 0;
@@ -357,45 +396,61 @@ void sendRequest(unsigned long now) {
   }
 }
 
-int mapJoystickAxis(int value, int center, int threshold, int dualRate, int trimming) {
-  if (value >= center - threshold && value <= center + threshold) value = 0;
-  else if (value < center)
-    value = map(value, 0, center - threshold, -dualRate, 0);
-  else if (value > center)
-    value = map(value, center + threshold, 1023, 0, dualRate);
-  value += trimming;
-  return value;
+int mapAxis(
+  int joyValue,
+  int joyCenter,
+  int joyThreshold,
+  bool joyInvert,
+  int dualRate,
+  int trimming
+) {
+  int centerPulse = CENTER_PULSE + trimming,
+      minPulse = centerPulse - dualRate,
+      maxPulse = centerPulse + dualRate,
+      pulse = centerPulse;
+
+  if (joyInvert) {
+    joyValue = 1023 - joyValue;
+    joyCenter = 1023 - joyCenter;
+  }
+
+  if (joyValue >= joyCenter - joyThreshold && joyValue <= joyCenter + joyThreshold)
+    pulse = centerPulse;
+  else if (joyValue < joyCenter)
+    pulse = map(joyValue, 0, joyCenter - joyThreshold, minPulse, centerPulse);
+  else if (joyValue > joyCenter)
+    pulse = map(joyValue, joyCenter + joyThreshold, 1023, centerPulse, maxPulse);
+
+  return constrain(pulse, 0, 5000);
 }
 
-int readJoystickAxis(JoystickAxis axis) {
-  int rawValue = analogRead(joystickPins[axis]);
-  int value = mapJoystickAxis(
-    rawValue,
-    settings.joystick[axis].center,
-    settings.joystick[axis].threshold,
-    settings.joystick[axis].dualRate,
-    settings.joystick[axis].trimming
+int readAxis(Axis axis) {
+  int joyValue = analogRead(joystickPins[axis]);
+  return mapAxis(
+    joyValue,
+    settings.axes[axis].joyCenter,
+    settings.axes[axis].joyThreshold,
+    settings.axes[axis].joyInvert,
+    settings.axes[axis].dualRate,
+    settings.axes[axis].trimming
   );
-  if (settings.joystick[axis].invert)
-    value = -value;
-  return value;
 }
 
 void setJoystickCenter() {
-  int value[JOYSTICK_AXES_COUNT] = {0, 0, 0, 0},
+  int value[AXES_COUNT] = {0, 0, 0, 0},
       count = 5;
 
   PRINT(F("Setting joystick center..."));
 
   for (int i = 0; i < count; i++) {
-    for (int axis = 0; axis < JOYSTICK_AXES_COUNT; axis++) {
+    for (int axis = 0; axis < AXES_COUNT; axis++) {
       value[axis] += analogRead(joystickPins[axis]);
     }
     delay(100);
   }
 
-  for (int axis = 0; axis < JOYSTICK_AXES_COUNT; axis++) {
-    settings.joystick[axis].center = value[axis] / count;
+  for (int axis = 0; axis < AXES_COUNT; axis++) {
+    settings.axes[axis].joyCenter = value[axis] / count;
   }
 
   PRINTLN(F("DONE"));
@@ -471,7 +526,9 @@ void controlBeep(unsigned long now) {
 void redrawScreen() {
   char text[50] = "",
        yStr[] = "y",
-       nStr[] = "n";
+       nStr[] = "n",
+       axisNames[][3] = {"AX", "AY", "BX", "BY"};
+  Axis axis;
 
   display.fillRect(0, 0, 128, 64, BLACK);
 
@@ -484,8 +541,8 @@ void redrawScreen() {
         PSTR("Battary\nT: %d.%03dV\nR: %d.%03dV"),
         thisBattaryMV / 1000,
         thisBattaryMV % 1000,
-        response.battaryMV / 1000,
-        response.battaryMV % 1000
+        status.battaryMV / 1000,
+        status.battaryMV % 1000
       );
       break;
     case SCREEN_PROFILE:
@@ -495,99 +552,78 @@ void redrawScreen() {
         currentProfile
       );
       break;
+    case SCREEN_PIPE_ADDRESS:
+      sprintf_P(
+        text,
+        PSTR("Pipe addr\n%s"),
+        formatPipeAddress(settings.pipeAddressN)
+      );
+      break;
     case SCREEN_AUTO_CENTER:
       sprintf_P(
         text,
-        PSTR("Centers\n%d,%d,\n%d,%d"),
-        settings.joystick[JOYSTICK_A_X].center,
-        settings.joystick[JOYSTICK_A_Y].center,
-        settings.joystick[JOYSTICK_B_X].center,
-        settings.joystick[JOYSTICK_B_Y].center
+        PSTR("J centers\n%d,%d,\n%d,%d"),
+        settings.axes[AXIS_A_X].joyCenter,
+        settings.axes[AXIS_A_Y].joyCenter,
+        settings.axes[AXIS_B_X].joyCenter,
+        settings.axes[AXIS_B_Y].joyCenter
       );
       break;
     case SCREEN_DUAL_RATE_A_X:
-      sprintf_P(
-        text,
-        PSTR("D/R AX\n%d"),
-        settings.joystick[JOYSTICK_A_X].dualRate
-      );
-      break;
     case SCREEN_DUAL_RATE_A_Y:
-      sprintf_P(
-        text,
-        PSTR("D/R AY\n%d"),
-        settings.joystick[JOYSTICK_A_Y].dualRate
-      );
-      break;
     case SCREEN_DUAL_RATE_B_X:
-      sprintf_P(
-        text,
-        PSTR("D/R BX\n%d"),
-        settings.joystick[JOYSTICK_B_X].dualRate
-      );
-      break;
     case SCREEN_DUAL_RATE_B_Y:
+      axis = screenNum - SCREEN_DUAL_RATE_A_X;
       sprintf_P(
         text,
-        PSTR("D/R BY\n%d"),
-        settings.joystick[JOYSTICK_B_Y].dualRate
+        PSTR("D/R %s\n%d"),
+        axisNames[axis],
+        settings.axes[axis].dualRate
       );
       break;
     case SCREEN_TRIMMING_A_X:
-      sprintf_P(
-        text,
-        PSTR("Tr AX\n%d"),
-        settings.joystick[JOYSTICK_A_X].trimming
-      );
-      break;
     case SCREEN_TRIMMING_A_Y:
-      sprintf_P(
-        text,
-        PSTR("Tr AY\n%d"),
-        settings.joystick[JOYSTICK_A_Y].trimming
-      );
-      break;
     case SCREEN_TRIMMING_B_X:
-      sprintf_P(
-        text,
-        PSTR("Tr BX\n%d"),
-        settings.joystick[JOYSTICK_B_X].trimming
-      );
-      break;
     case SCREEN_TRIMMING_B_Y:
+      axis = screenNum - SCREEN_TRIMMING_A_X;
       sprintf_P(
         text,
-        PSTR("Tr BY\n%d"),
-        settings.joystick[JOYSTICK_B_Y].trimming
+        PSTR("Tr %s\n%d"),
+        axisNames[axis],
+        settings.axes[axis].trimming
       );
       break;
     case SCREEN_INVERT_A_X:
-      sprintf_P(
-        text,
-        PSTR("Invert AX\n%s"),
-        settings.joystick[JOYSTICK_A_X].invert ? yStr : nStr
-      );
-      break;
     case SCREEN_INVERT_A_Y:
-      sprintf_P(
-        text,
-        PSTR("Invert AY\n%s"),
-        settings.joystick[JOYSTICK_A_Y].invert ? yStr : nStr
-      );
-      break;
     case SCREEN_INVERT_B_X:
+    case SCREEN_INVERT_B_Y:
+      axis = screenNum - SCREEN_INVERT_A_X;
       sprintf_P(
         text,
-        PSTR("Invert BX\n%s"),
-        settings.joystick[JOYSTICK_B_X].invert ? yStr : nStr
+        PSTR("Invert %s\n%s"),
+        axisNames[axis],
+        settings.axes[axis].joyInvert ? yStr : nStr
       );
       break;
-    case SCREEN_INVERT_B_Y:
-      sprintf_P(
-        text,
-        PSTR("Invert BY\n%s"),
-        settings.joystick[JOYSTICK_B_Y].invert ? yStr : nStr
-      );
+    case SCREEN_CHANNEL_A_X:
+    case SCREEN_CHANNEL_A_Y:
+    case SCREEN_CHANNEL_B_X:
+    case SCREEN_CHANNEL_B_Y:
+      axis = screenNum - SCREEN_CHANNEL_A_X;
+      if (settings.axes[axis].channel != NO_CHANNEL) {
+        sprintf_P(
+          text,
+          PSTR("Channel %s\n%d"),
+          axisNames[axis],
+          settings.axes[axis].channel + 1
+        );
+      } else {
+        sprintf_P(
+          text,
+          PSTR("Channel %s\nNone"),
+          axisNames[axis]
+        );
+      }
       break;
     case SCREEN_SAVE:
       sprintf_P(
@@ -605,41 +641,36 @@ void redrawScreen() {
 }
 
 void controlScreen(unsigned long now) {
-  bool prevSettingsPress = settingsPress,
-       prevSettingsPlusPress = settingsPlusPress,
-       prevSettingsMinusPress = settingsMinusPress;
   int settingsValueChange = 0;
   Screen prevScreenNum = screenNum;
+  Axis axis;
 
-  settingsPress = digitalRead(SETTINGS_PIN) == LOW;
-  settingsPlusPress = digitalRead(SETTINGS_PLUS_PIN) == LOW;
-  settingsMinusPress = digitalRead(SETTINGS_MINUS_PIN) == LOW;
+  buttons.handle();
 
-  if (settingsPress && !prevSettingsPress) {
-    settingsPressTime = now;
-    screenNum = screenNum + ((Screen)1);
-    if (screenNum > LAST_SCREEN)
-      screenNum = FIRST_SCREEN;
-    PRINT(F("Screen: "));
-    PRINTLN(screenNum);
-    redrawScreen();
+  if (settingsButton.resetClicked()) {
+    if (settingsLongPress) {
+      settingsLongPress = false;
+    } else {
+      screenNum = screenNum + ((Screen)1);
+      if (screenNum > LAST_SCREEN)
+        screenNum = FIRST_SCREEN;
+      PRINT(F("Screen: "));
+      PRINTLN(screenNum);
+      redrawScreen();
+    }
   }
-
-  if (!settingsPress)
-    settingsPressTime = 0;
-
-  if (settingsPressTime > 0 && now - settingsPressTime > 2000) {
+  if (settingsButton.isHeld() && screenNum != NO_SCREEN) {
     screenNum = NO_SCREEN;
     PRINT(F("Screen: "));
     PRINTLN(screenNum);
     redrawScreen();
-    settingsPressTime = 0;
+    settingsLongPress = true;
   }
 
-  if (settingsPlusPress && !prevSettingsPlusPress) {
+  if (settingsPlusButton.resetClicked()) {
     settingsValueChange = 1;
   }
-  if (settingsMinusPress && !prevSettingsMinusPress) {
+  if (settingsMinusButton.resetClicked()) {
     settingsValueChange = -1;
   }
 
@@ -651,6 +682,13 @@ void controlScreen(unsigned long now) {
         );
         loadProfile();
         break;
+      case SCREEN_PIPE_ADDRESS:
+        addWithConstrain(
+          settings.pipeAddressN, settingsValueChange, 0, 9
+        );
+        sendPipeAddress(now, settings.pipeAddressN);
+        setPipeAddress(settings.pipeAddressN);
+        break;
       case SCREEN_AUTO_CENTER:
         if (settingsValueChange > 0) {
           tone(BEEP_PIN, BEEP_FREQ);
@@ -659,80 +697,47 @@ void controlScreen(unsigned long now) {
         }
         break;
       case SCREEN_DUAL_RATE_A_X:
-        addWithConstrain(
-          settings.joystick[JOYSTICK_A_X].dualRate,
-          settingsValueChange * 250,
-          DUAL_RATE_MIN,
-          DUAL_RATE_MAX
-        );
-        break;
       case SCREEN_DUAL_RATE_A_Y:
-        addWithConstrain(
-          settings.joystick[JOYSTICK_A_Y].dualRate,
-          settingsValueChange * 250,
-          DUAL_RATE_MIN,
-          DUAL_RATE_MAX
-        );
-        break;
       case SCREEN_DUAL_RATE_B_X:
-        addWithConstrain(
-          settings.joystick[JOYSTICK_B_X].dualRate,
-          settingsValueChange * 250,
-          DUAL_RATE_MIN,
-          DUAL_RATE_MAX
-        );
-        break;
       case SCREEN_DUAL_RATE_B_Y:
+        axis = screenNum - SCREEN_DUAL_RATE_A_X;
         addWithConstrain(
-          settings.joystick[JOYSTICK_B_Y].dualRate,
-          settingsValueChange * 250,
+          settings.axes[axis].dualRate,
+          settingsValueChange * 10,
           DUAL_RATE_MIN,
           DUAL_RATE_MAX
         );
         break;
       case SCREEN_TRIMMING_A_X:
-        addWithConstrain(
-          settings.joystick[JOYSTICK_A_X].trimming,
-          settingsValueChange * 100,
-          TRIMMING_MIN,
-          TRIMMING_MAX
-        );
-        break;
       case SCREEN_TRIMMING_A_Y:
-        addWithConstrain(
-          settings.joystick[JOYSTICK_A_Y].trimming,
-          settingsValueChange * 100,
-          TRIMMING_MIN,
-          TRIMMING_MAX
-        );
-        break;
       case SCREEN_TRIMMING_B_X:
-        addWithConstrain(
-          settings.joystick[JOYSTICK_B_X].trimming,
-          settingsValueChange * 100,
-          TRIMMING_MIN,
-          TRIMMING_MAX
-        );
-        break;
       case SCREEN_TRIMMING_B_Y:
+        axis = screenNum - SCREEN_TRIMMING_A_X;
         addWithConstrain(
-          settings.joystick[JOYSTICK_B_Y].trimming,
-          settingsValueChange * 100,
+          settings.axes[axis].trimming,
+          settingsValueChange * 10,
           TRIMMING_MIN,
           TRIMMING_MAX
         );
         break;
       case SCREEN_INVERT_A_X:
-        settings.joystick[JOYSTICK_A_X].invert = settingsValueChange > 0;
-        break;
       case SCREEN_INVERT_A_Y:
-        settings.joystick[JOYSTICK_A_Y].invert = settingsValueChange > 0;
-        break;
       case SCREEN_INVERT_B_X:
-        settings.joystick[JOYSTICK_B_X].invert = settingsValueChange > 0;
-        break;
       case SCREEN_INVERT_B_Y:
-        settings.joystick[JOYSTICK_B_Y].invert = settingsValueChange > 0;
+        axis = screenNum - SCREEN_INVERT_A_X;
+        settings.axes[axis].joyInvert = settingsValueChange > 0;
+        break;
+      case SCREEN_CHANNEL_A_X:
+      case SCREEN_CHANNEL_A_Y:
+      case SCREEN_CHANNEL_B_X:
+      case SCREEN_CHANNEL_B_Y:
+        axis = screenNum - SCREEN_CHANNEL_A_X;
+        addWithConstrain(
+          settings.axes[axis].channel,
+          settingsValueChange,
+          NO_CHANNEL,
+          NUM_CHANNELS - 1
+        );
         break;
       case SCREEN_SAVE:
         screenNum = NO_SCREEN;
