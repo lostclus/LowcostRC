@@ -2,42 +2,39 @@
 #include <RF24.h>
 #include <Servo.h>
 
-#include "protocol.h"
+#include <LowcostRC_Protocol.h>
 
 #undef WITH_CONSOLE
 //define WITH_CONSOLE
 
-#define CHANNEL1_PIN 4
-#define CHANNEL2_PIN 5
-#define CHANNEL3_PIN 3
+#define RESET_RF_CHANNEL_PIN 2
+
+#define CHANNEL1_PIN 3
+#define CHANNEL2_PIN 4
+#define CHANNEL3_PIN 5
 
 #define RADIO_CE_PIN 9
 #define RADIO_CSN_PIN 10
 
 #define VOLT_METER_PIN A0
-#define VOLT_METER_R1 10000L
+#define VOLT_METER_R1 30000L
 #define VOLT_METER_R2 10000L
 
-#define PIPE_ADDRESS_ROM_ADDR 0
-#define NOLINK_ROM_ADDR 7
-
-#define ENGINE_OFF_THRESHOLD 1200
-#define ENGINE_ON_THRESHOLD 1650
-#define ENGINE_POWER_MIN 1200
-#define ENGINE_POWER_MAX 2400
+#define RF_CHANNEL_ROM_ADDR 0
+#define NOLINK_ROM_ADDR 2
 
 const ControlPacket DEFAULT_NOLINK_CONTROL = {
   PACKET_TYPE_CONTROL,
   {1500, 1500, 1500, 1500}
 };
 
-bool engineOn = false;
 unsigned int battaryMV = 0;
 unsigned long controlTime,
               sendStatusTime;
 
-Servo channel1Servo, channel2Servo;
+Servo channel1Servo, channel2Servo, channel3Servo;
 RF24 radio(RADIO_CE_PIN, RADIO_CSN_PIN);
+byte pipe[7];
 
 #ifdef WITH_CONSOLE
 #define PRINT(x) Serial.print(x)
@@ -48,20 +45,17 @@ RF24 radio(RADIO_CE_PIN, RADIO_CSN_PIN);
 #endif
 
 void setup(void) {
-  char pipeAddressBuf[7];
-  char *pipeAddress;
+  int rfChannel = DEFAULT_RF_CHANNEL;
 
   #ifdef WITH_CONSOLE
   Serial.begin(115200);
   #endif
 
-  pinMode(CHANNEL3_PIN, OUTPUT);
-  digitalWrite(CHANNEL3_PIN, LOW);
-
   analogReference(DEFAULT);
 
   channel1Servo.attach(CHANNEL1_PIN);
   channel2Servo.attach(CHANNEL2_PIN);
+  channel3Servo.attach(CHANNEL3_PIN);
 
   if (radio.begin()) {
     PRINTLN(F("Radio init: OK"));
@@ -71,16 +65,18 @@ void setup(void) {
   radio.setRadiation(RF24_PA_MAX, RF24_250KBPS);
   radio.setPayloadSize(PACKET_SIZE);
 
-  EEPROM.get(PIPE_ADDRESS_ROM_ADDR, pipeAddressBuf);
-  if (pipeAddressBuf[0] == DEFAULT_PIPE_ADDR[0]) {
-    pipeAddress = pipeAddressBuf;
-  } else {
-    pipeAddress = DEFAULT_PIPE_ADDR;
+  if (!digitalRead(RESET_RF_CHANNEL_PIN) == LOW) {
+    EEPROM.get(RF_CHANNEL_ROM_ADDR, rfChannel);
+    if (rfChannel > 125 || rfChannel < 0) {
+      rfChannel = DEFAULT_RF_CHANNEL;
+    }
   }
+  radio.setChannel(rfChannel);
+  PRINT(F("RF channel: "));
+  PRINTLN(rfChannel);
 
-  radio.openReadingPipe(1, (byte*)pipeAddress);
-  PRINT(F("Radio pipe address: "));
-  PRINTLN(pipeAddress);
+  sprintf_P(pipe, PSTR(PIPE_FORMAT), rfChannel);
+  radio.openReadingPipe(1, pipe);
 
   radio.enableAckPayload();
   radio.startListening();
@@ -123,11 +119,13 @@ void loop(void) {
       #endif
 
       applyControl(&rp.control);
-    } else if (rp.generic.packetType == PACKET_TYPE_SET_PIPE_ADDRESS) {
-      radio.openReadingPipe(1, (byte*)rp.address.pipeAddress);
-      PRINT(F("New radio pipe address: "));
-      PRINTLN(rp.address.pipeAddress);
-      EEPROM.put(PIPE_ADDRESS_ROM_ADDR, rp.address.pipeAddress);
+    } else if (rp.generic.packetType == PACKET_TYPE_SET_RF_CHANNEL) {
+      radio.setChannel(rp.rfChannel.rfChannel);
+      sprintf_P(pipe, PSTR(PIPE_FORMAT), rp.rfChannel.rfChannel);
+      radio.openReadingPipe(1, pipe);
+      PRINT(F("New RF channel: "));
+      PRINTLN(rp.rfChannel.rfChannel);
+      EEPROM.put(RF_CHANNEL_ROM_ADDR, rp.rfChannel.rfChannel);
     } else if (rp.generic.packetType == PACKET_TYPE_COMMAND) {
       if (rp.command.command == COMMAND_SAVE_FOR_NOLINK && hasLastChannels) {
         PRINT(F("Saving state for no link"));
@@ -152,30 +150,12 @@ void loop(void) {
 }
 
 void applyControl(ControlPacket *control) {
-  int ch3, engine;
-
   if (control->channels[CHANNEL1])
     channel1Servo.writeMicroseconds(control->channels[CHANNEL1]);
   if (control->channels[CHANNEL2])
     channel2Servo.writeMicroseconds(control->channels[CHANNEL2]);
-
-  ch3 = control->channels[CHANNEL3];
-  if (engineOn) {
-    if (ch3 < ENGINE_OFF_THRESHOLD)
-      engineOn = false;
-  } else if (ch3 > ENGINE_ON_THRESHOLD) {
-    engineOn = true;
-  }
-
-  if (engineOn) {
-    engine = map(
-      constrain(ch3, ENGINE_POWER_MIN, ENGINE_POWER_MAX),
-      ENGINE_POWER_MIN, ENGINE_POWER_MAX, 0, 255
-    );
-  } else {
-    engine = 0;
-  }
-  analogWrite(CHANNEL3_PIN, engine);
+  if (control->channels[CHANNEL3])
+    channel3Servo.writeMicroseconds(control->channels[CHANNEL3]);
 }
 
 void sendStatus() {

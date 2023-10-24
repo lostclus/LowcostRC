@@ -1,10 +1,12 @@
-const char DEFAULT_PIPE_ADDR[] = "lcrc0";
+const int DEFAULT_RF_CHANNEL = 76;
 const size_t PACKET_SIZE = 16;
+
+#define PIPE_FORMAT "lcr%03d"
 
 enum PacketType {
   PACKET_TYPE_CONTROL = 0x0a01,
   PACKET_TYPE_STATUS = 0x0a02,
-  PACKET_TYPE_SET_PIPE_ADDRESS = 0x0a03,
+  PACKET_TYPE_SET_RF_CHANNEL = 0x0a03,
   PACKET_TYPE_COMMAND = 0x0a04
 };
 
@@ -37,9 +39,9 @@ struct StatusPacket{
   int battaryMV;
 };
 
-struct SetAddressPacket{
+struct SetRFChannelPacket{
   PacketType packetType;
-  char pipeAddress[6];
+  int rfChannel;
 };
 
 struct CommandPacket{
@@ -50,7 +52,7 @@ struct CommandPacket{
 union RequestPacket {
   struct GenericPacket generic;
   struct ControlPacket control;
-  struct SetAddressPacket address;
+  struct SetRFChannelPacket rfChannel;
   struct CommandPacket command;
 };
 

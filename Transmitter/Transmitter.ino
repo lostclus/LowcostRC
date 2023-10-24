@@ -6,7 +6,7 @@
 #include <Adafruit_SSD1306.h>
 #include <AbleButtons.h>
 
-#include "protocol.h"
+#include <LowcostRC_Protocol.h>
 
 #undef WITH_CONSOLE
 #define WITH_CONSOLE
@@ -49,12 +49,11 @@ struct AxisSettings {
 
 struct Settings {
   int magick;
-  int pipeAddressN;
+  int rfChannel;
   AxisSettings axes[AXES_COUNT];
 };
 
-const int DEFAULT_PIPE_ADDRESS_N = 0,
-          DEFAULT_JOY_CENTER = 512,
+const int DEFAULT_JOY_CENTER = 512,
           DEFAULT_JOY_THRESHOLD = 1;
 const bool DEFAULT_JOY_INVERT = false;
 const int CENTER_PULSE = 1500,
@@ -67,7 +66,7 @@ const int CENTER_PULSE = 1500,
 
 const Settings defaultSettings PROGMEM = {
   SETTINGS_MAGICK,
-  DEFAULT_PIPE_ADDRESS_N,
+  DEFAULT_RF_CHANNEL,
   {
     {
       DEFAULT_JOY_CENTER,
@@ -112,7 +111,7 @@ enum Screen {
   NO_SCREEN,
   SCREEN_BATTARY,
   SCREEN_PROFILE,
-  SCREEN_PIPE_ADDRESS,
+  SCREEN_RF_CHANNEL,
   SCREEN_AUTO_CENTER,
   SCREEN_DUAL_RATE_A_X,
   SCREEN_DUAL_RATE_A_Y,
@@ -182,9 +181,8 @@ ButtonList buttons(buttonsArray);
 
 bool loadProfile();
 void saveProfile();
-char *formatPipeAddress(int pipeAddressN);
-void setPipeAddress(int pipeAddressN);
-void sendPipeAddress(unsigned long now, int pipeAddressN);
+void setRFChannel(int rfChannel);
+void sendRFChannel(unsigned long now, int rfChannel);
 void sendCommand(unsigned long now);
 void controlLoop(unsigned long now);
 int readAxis(Axis axis);
@@ -197,7 +195,6 @@ void controlScreen(unsigned long now);
 void setup(void)
 {
   bool needsSetJoystickCenter = false;
-  char *pipeAddress;
 
   #ifdef WITH_CONSOLE
   Serial.begin(115200);
@@ -231,7 +228,7 @@ void setup(void)
   radio.setPayloadSize(PACKET_SIZE);
   radio.enableAckPayload();
 
-  setPipeAddress(settings.pipeAddressN);
+  setRFChannel(settings.rfChannel);
 
   if (needsSetJoystickCenter) {
     setJoystickCenter();
@@ -283,24 +280,21 @@ void saveProfile() {
   EEPROM.put(PROFILES_ADDR + currentProfile * SETTINGS_SIZE, settings);
 }
 
-char *formatPipeAddress(int pipeAddressN) {
-  static char addr[6];
-  sprintf_P(addr, PSTR("lcrc%01d"), pipeAddressN);
-  return addr;
+void setRFChannel(int rfChannel) {
+  byte pipe[7];
+
+  radio.setChannel(rfChannel);
+  sprintf_P(pipe, PSTR(PIPE_FORMAT), rfChannel);
+  radio.openWritingPipe(pipe);
+
+  PRINT(F("RF channel: "));
+  PRINTLN(rfChannel);
 }
 
-void setPipeAddress(int pipeAddressN) {
-  char *pipeAddress = formatPipeAddress(settings.pipeAddressN);
-  radio.openWritingPipe((byte*)pipeAddress);
-  PRINT(F("Radio pipe address: "));
-  PRINTLN(pipeAddress);
-}
-
-void sendPipeAddress(unsigned long now, int pipeAddressN) {
-  char *pipeAddress = formatPipeAddress(settings.pipeAddressN);
+void sendRFChannel(unsigned long now, int rfChannel) {
   union RequestPacket rp;
-  rp.address.packetType = PACKET_TYPE_SET_PIPE_ADDRESS;
-  strcpy(rp.address.pipeAddress, pipeAddress);
+  rp.rfChannel.packetType = PACKET_TYPE_SET_RF_CHANNEL;
+  rp.rfChannel.rfChannel = rfChannel;
   sendRequest(now, &rp);
 }
 
@@ -561,11 +555,11 @@ void redrawScreen() {
         currentProfile
       );
       break;
-    case SCREEN_PIPE_ADDRESS:
+    case SCREEN_RF_CHANNEL:
       sprintf_P(
         text,
-        PSTR("Pipe addr\n%s"),
-        formatPipeAddress(settings.pipeAddressN)
+        PSTR("RF channel\n%d"),
+        settings.rfChannel
       );
       break;
     case SCREEN_AUTO_CENTER:
@@ -703,14 +697,14 @@ void controlScreen(unsigned long now) {
           currentProfile, settingsValueChange, 0, NUM_PROFILES - 1
         );
         loadProfile();
-        setPipeAddress(settings.pipeAddressN);
+        setRFChannel(settings.rfChannel);
         break;
-      case SCREEN_PIPE_ADDRESS:
+      case SCREEN_RF_CHANNEL:
         addWithConstrain(
-          settings.pipeAddressN, settingsValueChange, 0, 9
+          settings.rfChannel, settingsValueChange, 0, 125
         );
-        sendPipeAddress(now, settings.pipeAddressN);
-        setPipeAddress(settings.pipeAddressN);
+        sendRFChannel(now, settings.rfChannel);
+        setRFChannel(settings.rfChannel);
         break;
       case SCREEN_AUTO_CENTER:
         if (settingsValueChange > 0) {
