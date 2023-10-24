@@ -51,6 +51,8 @@ void setup(void) {
   Serial.begin(115200);
   #endif
 
+  pinMode(RESET_RF_CHANNEL_PIN, INPUT_PULLUP);
+
   analogReference(DEFAULT);
 
   channel1Servo.attach(CHANNEL1_PIN);
@@ -65,7 +67,7 @@ void setup(void) {
   radio.setRadiation(RF24_PA_MAX, RF24_250KBPS);
   radio.setPayloadSize(PACKET_SIZE);
 
-  if (!digitalRead(RESET_RF_CHANNEL_PIN) == LOW) {
+  if (digitalRead(RESET_RF_CHANNEL_PIN) != LOW) {
     EEPROM.get(RF_CHANNEL_ROM_ADDR, rfChannel);
     if (rfChannel > 125 || rfChannel < 0) {
       rfChannel = DEFAULT_RF_CHANNEL;
