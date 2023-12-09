@@ -1,0 +1,15 @@
+BOARD=arduino:avr:uno
+PORT=/dev/ttyUSB0
+
+compile:
+	arduino-cli compile \
+		-b $(BOARD) \
+		-b "$(BOARD)" \
+		.
+
+upload:
+	arduino-cli upload \
+		-v \
+		-b "$(BOARD)" \
+		-p $(PORT) \
+		.

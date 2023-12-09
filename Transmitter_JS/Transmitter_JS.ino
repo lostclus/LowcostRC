@@ -1,7 +1,9 @@
+#include <string.h>
 #include <EEPROM.h>
 #include <RF24.h>
+#include <AbleButtons.h>
 
-#include "protocol.h"
+#include <LowcostRC_Protocol.h>
 
 #undef WITH_CONSOLE
 #define WITH_CONSOLE
@@ -9,58 +11,78 @@
 #define RADIO_CE_PIN 9
 #define RADIO_CSN_PIN 10
 
-#define JOYSTICK_X_PIN 0
-#define JOYSTICK_Y_PIN 1
-#define JOYSTICK_X_CENTER 512
-#define JOYSTICK_Y_CENTER 512
-#define JOYSTICK_X_THRESHOLD 0
-#define JOYSTICK_Y_THRESHOLD 0
-
-#undef JOYSTICK_INVERT_X
-#define JOYSTICK_INVERT_Y
-#undef JOYSTICK_SWAP_AXIS
-
-#define ENGINE_UP_PIN 2
-#define ENGINE_DOWN_PIN 3
-#define ENGINE_OFF_PIN 4
-#define ENGINE_AFTERBURNER_PIN 5
-
-#define ENGINE_OFF 0
-#define ENGINE_MIN 20
-#define ENGINE_AFTERBURNER_THRESHOLD 240
-#define ENGINE_MAX 255
-
 #define BEEP_PIN A2
-#define TRIM_SET_PIN 6
-#define ALERONS_TRIM_PIN 3
-#define ELEVATOR_TRIM_PIN 4
 
 #define SETTINGS_MAGICK 0x5555
 #define SETTINGS_ADDR 0
 
+enum Axis {
+  AXIS_A_X,
+  AXIS_A_Y,
+  AXES_COUNT,
+};
+
+int joystickPins[] = {A0, A1};
+
+struct AxisSettings {
+  int joyCenter,
+      joyThreshold;
+  bool joyInvert;
+  int dualRate,
+      trimming;
+  ChannelN channel;
+};
+
 struct Settings {
   int magick;
-  int joystick_x_center,
-      joystick_y_center,
-      joystick_x_threshold,
-      joystick_y_threshold,
-      aleronsShift,
-      aleronsTrim,
-      elevatorShift,
-      elevatorTrim;
+  int rfChannel;
+  AxisSettings axes[AXES_COUNT];
 };
+
+const int DEFAULT_JOY_CENTER = 512,
+          DEFAULT_JOY_THRESHOLD = 1;
+const bool DEFAULT_JOY_INVERT = false;
+const int CENTER_PULSE = 1500,
+          DEFAULT_DUAL_RATE = 900,
+          DEFAULT_TRIMMING = 0,
+          DUAL_RATE_MIN = 10,
+          DUAL_RATE_MAX = 1500,
+          TRIMMING_MIN = -1500,
+          TRIMMING_MAX = 1500;
 
 const Settings defaultSettings PROGMEM = {
   SETTINGS_MAGICK,
-  JOYSTICK_X_CENTER,
-  JOYSTICK_Y_CENTER,
-  JOYSTICK_X_THRESHOLD,
-  JOYSTICK_Y_THRESHOLD,
-  0, 16,
-  0, 16,
+  78, // DEFAULT_RF_CHANNEL,
+  {
+    {
+      DEFAULT_JOY_CENTER,
+      DEFAULT_JOY_THRESHOLD,
+      DEFAULT_JOY_INVERT,
+      DEFAULT_DUAL_RATE,
+      DEFAULT_TRIMMING,
+      CHANNEL1
+    },
+    {
+      DEFAULT_JOY_CENTER,
+      DEFAULT_JOY_THRESHOLD,
+      DEFAULT_JOY_INVERT,
+      DEFAULT_DUAL_RATE,
+      DEFAULT_TRIMMING,
+      CHANNEL2
+    }
+  }
 };
 
 Settings settings;
+#define SETTINGS_SIZE sizeof(settings)
+
+#define CHANNEL1_UP_PIN 2
+#define CHANNEL1_DOWN_PIN 3
+#define CHANNEL1_CENTER_PIN 4
+
+#define CHANNEL1_MIN 1000
+#define CHANNEL1_MAX 2000
+#define CHANNEL1_STEP 50
 
 unsigned long requestSendTime = 0,
               errorTime = 0,
@@ -68,14 +90,29 @@ unsigned long requestSendTime = 0,
               beepTime = 0;
 bool statusRadioSuccess = false,
      statusRadioFailure = false,
-     engineUpPress = false,
-     engineDownPress = false,
      beepState = false;
+int channel3Pulse = (CHANNEL1_MIN + CHANNEL1_MAX) / 2;
 int beepDuration = 0,
     beepPause = 0,
     beepCount = 0;
 
+struct StatusPacket status;
+
 RF24 radio(RADIO_CE_PIN, RADIO_CSN_PIN);
+
+using Button = AblePullupClickerButton;
+using ButtonList = AblePullupClickerButtonList;
+
+Button channel3UpButton(CHANNEL1_DOWN_PIN),
+       channel3DownButton(CHANNEL1_UP_PIN),
+       channel3CenterButton(CHANNEL1_CENTER_PIN);
+
+Button *buttonsArray[] = {
+  &channel3UpButton,
+  &channel3DownButton,
+  &channel3CenterButton
+};
+ButtonList buttons(buttonsArray);
 
 #ifdef WITH_CONSOLE
 #define PRINT(x) Serial.print(x)
@@ -85,42 +122,35 @@ RF24 radio(RADIO_CE_PIN, RADIO_CSN_PIN);
 #define PRINTLN(x) __asm__ __volatile__ ("nop\n\t")
 #endif
 
+bool loadProfile();
+void setRFChannel(int rfChannel);
 void controlLoop(unsigned long now);
-int mapJoystickDimension(int value, int center, int threshold);
-void readJoystick(int &joyx, int &joyy);
-void calibrateJoystick();
+int readAxis(Axis axis);
+void setJoystickCenter();
 void controlBeep(unsigned long now);
-void controlTrim(bool force);
 
 void setup(void)
 {
-  bool needsCalibrateJoystick = false;
+  bool needsSetJoystickCenter = false;
 
   #ifdef WITH_CONSOLE
   Serial.begin(115200);
   #endif
+  PRINTLN(F("Starting..."));
 
-  pinMode(JOYSTICK_X_PIN, INPUT);
-  pinMode(JOYSTICK_Y_PIN, INPUT);
+  for (int axis = 0; axis < AXES_COUNT; axis++) {
+    pinMode(joystickPins[axis], INPUT);
+  }
 
-  pinMode(ENGINE_UP_PIN, INPUT_PULLUP);
-  pinMode(ENGINE_DOWN_PIN, INPUT_PULLUP);
-  pinMode(ENGINE_OFF_PIN, INPUT_PULLUP);
-  pinMode(ENGINE_AFTERBURNER_PIN, INPUT_PULLUP);
+  buttons.begin();
+  channel3UpButton.setDebounceTime(20);
+  channel3DownButton.setDebounceTime(20);
+  channel3CenterButton.setDebounceTime(20);
+
   pinMode(BEEP_PIN, OUTPUT);
 
-  PRINTLN(F("Reading settings from flash ROM..."));
-  EEPROM.get(SETTINGS_ADDR, settings);
-  if (settings.magick != SETTINGS_MAGICK) {
-    PRINTLN(F("No stored settings found, use defaults"));
-    memcpy_P(&settings, &defaultSettings, sizeof(settings));
-    needsCalibrateJoystick = true;
-  } else {
-    PRINTLN(F("Using stored settings in flash ROM"));
-  }
-  // settings.aleronsTrim = 3;
-  // settings.elevatorTrim = 8;
-  controlTrim(true);
+  if (!loadProfile())
+    needsSetJoystickCenter = true;
 
   if (radio.begin()) {
     PRINTLN(F("Radio init: OK"));
@@ -128,24 +158,19 @@ void setup(void)
     PRINTLN("Radio init: FAILURE");
   }
   radio.setRadiation(RF24_PA_MAX, RF24_250KBPS);
-  radio.setPayloadSize(16);
+  radio.setPayloadSize(PACKET_SIZE);
   radio.enableAckPayload();
-  radio.openWritingPipe(RADIO_PIPE);
 
-  if (digitalRead(ENGINE_DOWN_PIN) == LOW || needsCalibrateJoystick) {
-    calibrateJoystick();
+  setRFChannel(settings.rfChannel);
+
+  if (needsSetJoystickCenter) {
+    setJoystickCenter();
   }
-
-  request.magick = MAGICK;
-  request.alerons = 0;
-  request.elevator = 0;
-  request.engine = 0;
 }
 
 void loop(void) {
   unsigned long now = millis();
 
-  controlTrim(false);
   controlLoop(now);
 
   if (errorTime > 0 && now - errorTime > 250) {
@@ -159,94 +184,94 @@ void loop(void) {
   controlBeep(now);
 }
 
+bool loadProfile() {
+  PRINT(F("Reading settings"));
+  PRINTLN(F(" from flash ROM..."));
+  EEPROM.get(SETTINGS_ADDR, settings);
+
+  if (true /*settings.magick != SETTINGS_MAGICK*/) {
+    PRINTLN(F("No stored settings found, use defaults"));
+    memcpy_P(&settings, &defaultSettings, SETTINGS_SIZE);
+    return false;
+  }
+
+  PRINTLN(F("Using stored settings in flash ROM"));
+  return true;
+}
+
+void setRFChannel(int rfChannel) {
+  byte pipe[7];
+
+  radio.setChannel(rfChannel);
+  sprintf_P(pipe, PSTR(PIPE_FORMAT), rfChannel);
+  radio.openWritingPipe(pipe);
+
+  PRINT(F("RF channel: "));
+  PRINTLN(rfChannel);
+}
+
 void controlLoop(unsigned long now) {
-  int joyx, joyy;
-  bool isChanged;
-  int prevAlerons = request.alerons,
-      prevElevator = request.elevator,
-      engineDelta = 0;
-  byte prevEngine = request.engine;
-  bool engineOffPress,
-       prevEngineUpPress = engineUpPress,
-       prevEngineDownPress = engineDownPress;
+  union RequestPacket rp;
+  bool isChanged = false;
+  static int prevChannels[NUM_CHANNELS];
 
-  readJoystick(joyx, joyy);
-  request.alerons = (joyx + settings.aleronsShift) / 16 * settings.aleronsTrim;
-  request.elevator = (joyy + settings.elevatorShift) / 16 * settings.elevatorTrim;
+  rp.control.packetType = PACKET_TYPE_CONTROL;
 
-  engineOffPress = digitalRead(ENGINE_OFF_PIN) == LOW;
-  engineUpPress = digitalRead(ENGINE_UP_PIN) == LOW;
-  engineDownPress = digitalRead(ENGINE_DOWN_PIN) == LOW;
-  if (digitalRead(ENGINE_AFTERBURNER_PIN) == LOW) {
-    engineAfterburnerPressTime = now;
-  }
-
-  if (engineUpPress && !prevEngineUpPress) {
-    engineDelta = 10;
-  }
-  if (engineDownPress && !prevEngineDownPress) {
-    engineDelta = -10;
-  }
-
-  if (engineAfterburnerPressTime > 0) {
-    if (now - engineAfterburnerPressTime < 10000) {
-      if (engineDownPress) {
-        request.engine = ENGINE_AFTERBURNER_THRESHOLD;
-        engineAfterburnerPressTime = 0;
-      } else if (engineOffPress) {
-        request.engine = ENGINE_OFF;
-        engineAfterburnerPressTime = 0;
-      } else {
-        request.engine = ENGINE_MAX;
-      }
-    } else {
-      request.engine = ENGINE_AFTERBURNER_THRESHOLD;
-      engineAfterburnerPressTime = 0;
+  for (int channel = 0; channel < NUM_CHANNELS; channel++)
+    rp.control.channels[channel] = 0;
+  for (int axis = 0; axis < AXES_COUNT; axis++) {
+    ChannelN channel = settings.axes[axis].channel;
+    if (channel != NO_CHANNEL) {
+      rp.control.channels[channel] = readAxis(axis);
     }
   }
-  if (engineOffPress) {
-    request.engine = ENGINE_OFF;
-  } else if (engineDelta) {
-    request.engine = max(
-      ENGINE_MIN,
-      min(
-        ENGINE_AFTERBURNER_THRESHOLD,
-        request.engine + engineDelta
-      )
-    ); 
-  }
 
-  isChanged = (
-    request.alerons != prevAlerons
-    || request.elevator != prevElevator
-    || request.engine != prevEngine
-  );
+  if (channel3UpButton.resetClicked()) {
+    channel3Pulse = constrain(
+      channel3Pulse + CHANNEL1_STEP, CHANNEL1_MIN, CHANNEL1_MAX
+    );
+  }
+  if (channel3DownButton.resetClicked()) {
+    channel3Pulse = constrain(
+      channel3Pulse - CHANNEL1_STEP, CHANNEL1_MIN, CHANNEL1_MAX
+    );
+  }
+  if (channel3CenterButton.resetClicked()) {
+    channel3Pulse = (CHANNEL1_MIN + CHANNEL1_MAX) / 2;
+  }
+  rp.control.channels[CHANNEL3] = channel3Pulse;
+
+  for (int channel = 0; channel < NUM_CHANNELS; channel++)
+    isChanged = isChanged || rp.control.channels[channel] != prevChannels[channel];
+
+  for (int channel = 0; channel < NUM_CHANNELS; channel++)
+    prevChannels[channel] = rp.control.channels[channel];
 
   if (
     isChanged
+    /*
     || (requestSendTime > 0 && now - requestSendTime > 1000)
     || (errorTime > 0 && now - errorTime < 200)
+    */
   ) {
-    PRINT(F("alerons: "));
-    PRINT(request.alerons);
-    PRINT(F("; elevator: "));
-    PRINT(request.elevator);
-    PRINT(F("; engine: "));
-    PRINT(request.engine);
-    PRINT(F("; alerons trim: "));
-    PRINT(settings.aleronsTrim);
-    PRINT(F("; elevator trim: "));
-    PRINTLN(settings.elevatorTrim);
+    PRINT(F("ch1: "));
+    PRINT(rp.control.channels[CHANNEL1]);
+    PRINT(F("; ch2: "));
+    PRINT(rp.control.channels[CHANNEL2]);
+    PRINT(F("; ch3: "));
+    PRINT(rp.control.channels[CHANNEL3]);
+    PRINT(F("; ch4: "));
+    PRINTLN(rp.control.channels[CHANNEL4]);
 
-    sendRequest(now);
+    sendRequest(now, &rp);
   }
 
   if (radio.isAckPayloadAvailable()) {
-    radio.read(&response, sizeof(response));
-    if (response.magick == MAGICK) {
+    radio.read(&status, sizeof(status));
+    if (status.packetType == PACKET_TYPE_STATUS) {
       PRINT(F("battaryMV: "));
-      PRINTLN(response.battaryMV);
-      if (response.battaryMV < 3100) {
+      PRINTLN(status.battaryMV);
+      if (status.battaryMV < 3400) {
         beepCount = 3;
         beepDuration = 200;
         beepPause = 100;
@@ -255,12 +280,17 @@ void controlLoop(unsigned long now) {
   }
 }
 
-void sendRequest(unsigned long now) {
+void sendRequest(unsigned long now, union RequestPacket *packet) {
   static bool prevStatusRadioSuccess = false,
               prevStatusRadioFailure = false;
   bool radioOK, isStatusChanged;
 
-  radioOK = radio.write(&request, sizeof(request));
+  PRINT(F("Sending packet type: "));
+  PRINT(packet->generic.packetType);
+  PRINT(F("; size: "));
+  PRINTLN(sizeof(*packet));
+
+  radioOK = radio.write(packet, sizeof(*packet));
   if (radioOK) {
     requestSendTime = now;
     errorTime = 0;
@@ -277,8 +307,10 @@ void sendRequest(unsigned long now) {
     beepPause = 5;
   }
 
-  isStatusChanged = (statusRadioSuccess != prevStatusRadioSuccess ||
-                     statusRadioFailure != prevStatusRadioFailure);
+  isStatusChanged = (
+    statusRadioSuccess != prevStatusRadioSuccess
+    || statusRadioFailure != prevStatusRadioFailure
+  );
   prevStatusRadioSuccess = statusRadioSuccess;
   prevStatusRadioFailure = statusRadioFailure;
 
@@ -289,57 +321,63 @@ void sendRequest(unsigned long now) {
   }
 }
 
-int mapJoystickDimension(int value, int center, int threshold) {
-  if (value >= center - threshold &&
-      value <= center + threshold) value = 0;
-  else if (value < center)
-    value = map(value, 0, center - threshold, -16000, 0);
-  else if (value > center)
-    value = map(value, center + threshold, 1023, 0, 16000);
-  return value;
-}
+int mapAxis(
+  int joyValue,
+  int joyCenter,
+  int joyThreshold,
+  bool joyInvert,
+  int dualRate,
+  int trimming
+) {
+  int centerPulse = CENTER_PULSE + trimming,
+      minPulse = centerPulse - dualRate,
+      maxPulse = centerPulse + dualRate,
+      pulse = centerPulse;
 
-void readJoystick(int &joyx, int &joyy) {
-  joyx = analogRead(JOYSTICK_X_PIN);
-  joyy = analogRead(JOYSTICK_Y_PIN);
-
-  joyx = mapJoystickDimension(
-    joyx,
-    settings.joystick_x_center,
-    settings.joystick_x_threshold);
-  joyy = mapJoystickDimension(
-    joyy,
-    settings.joystick_y_center,
-    settings.joystick_y_threshold);
-
-  #ifdef JOYSTICK_INVERT_X
-  joyx = -joyx;
-  #endif
-  #ifdef JOYSTICK_INVERT_Y
-  joyy = -joyy;
-  #endif
-  #ifdef JOYSTICK_SWAP_AXIS
-  int joyswp = joyx;
-  joyx = joyy; joyy = joyswp;
-  #endif
-}
-
-void calibrateJoystick() {
-  int joyx = 0,
-      joyy = 0,
-      count = 5;
-
-  PRINT(F("Calibrating joystick..."));
-  for (int i = 0; i < count; i++) {
-    joyx += analogRead(JOYSTICK_X_PIN);
-    joyy += analogRead(JOYSTICK_Y_PIN);
-    delay(200);
+  if (joyInvert) {
+    joyValue = 1023 - joyValue;
+    joyCenter = 1023 - joyCenter;
   }
 
-  settings.joystick_x_center = joyx / count;
-  settings.joystick_y_center = joyy / count;
+  if (joyValue >= joyCenter - joyThreshold && joyValue <= joyCenter + joyThreshold)
+    pulse = centerPulse;
+  else if (joyValue < joyCenter)
+    pulse = map(joyValue, 0, joyCenter - joyThreshold, minPulse, centerPulse);
+  else if (joyValue > joyCenter)
+    pulse = map(joyValue, joyCenter + joyThreshold, 1023, centerPulse, maxPulse);
 
-  EEPROM.put(SETTINGS_ADDR, settings);
+  return constrain(pulse, 0, 5000);
+}
+
+int readAxis(Axis axis) {
+  int joyValue = analogRead(joystickPins[axis]);
+  return mapAxis(
+    joyValue,
+    settings.axes[axis].joyCenter,
+    settings.axes[axis].joyThreshold,
+    settings.axes[axis].joyInvert,
+    settings.axes[axis].dualRate,
+    settings.axes[axis].trimming
+  );
+}
+
+void setJoystickCenter() {
+  int value[AXES_COUNT] = {0, 0},
+      count = 5;
+
+  PRINT(F("Setting joystick center..."));
+
+  for (int i = 0; i < count; i++) {
+    for (int axis = 0; axis < AXES_COUNT; axis++) {
+      value[axis] += analogRead(joystickPins[axis]);
+    }
+    delay(100);
+  }
+
+  for (int axis = 0; axis < AXES_COUNT; axis++) {
+    settings.axes[axis].joyCenter = value[axis] / count;
+  }
+
   PRINTLN(F("DONE"));
 }
 
@@ -358,13 +396,10 @@ void controlBeep(unsigned long now) {
       }
     } 
   }
-  digitalWrite(BEEP_PIN, beepState ? HIGH : LOW);
-}
-
-void controlTrim(bool force) {
-  if (force || digitalRead(TRIM_SET_PIN) == LOW) {
-    settings.aleronsTrim = map(analogRead(ALERONS_TRIM_PIN), 0, 1023, 1, 16);
-    settings.elevatorTrim = map(analogRead(ELEVATOR_TRIM_PIN), 0, 1023, 1, 16);
+  if (beepState) {
+    digitalWrite(BEEP_PIN, HIGH);
+  } else {
+    digitalWrite(BEEP_PIN, LOW);
   }
 }
 
