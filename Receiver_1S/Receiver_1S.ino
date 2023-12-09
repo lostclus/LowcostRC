@@ -23,17 +23,14 @@
 #define RF_CHANNEL_ROM_ADDR 0
 #define NOLINK_ROM_ADDR 2
 
-#define ENGINE_OFF_THRESHOLD 1200
-#define ENGINE_ON_THRESHOLD 1650
-#define ENGINE_POWER_MIN 1200
-#define ENGINE_POWER_MAX 2400
+#define ENGINE_POWER_MIN 1000
+#define ENGINE_POWER_MAX 2000
 
 const ControlPacket DEFAULT_NOLINK_CONTROL = {
   PACKET_TYPE_CONTROL,
   {1500, 1500, 1500, 1500}
 };
 
-bool engineOn = false;
 unsigned int battaryMV = 0;
 unsigned long controlTime,
               sendStatusTime;
@@ -160,30 +157,18 @@ void loop(void) {
 }
 
 void applyControl(ControlPacket *control) {
-  int ch3, engine;
-
   if (control->channels[CHANNEL1])
     channel1Servo.writeMicroseconds(control->channels[CHANNEL1]);
   if (control->channels[CHANNEL2])
     channel2Servo.writeMicroseconds(control->channels[CHANNEL2]);
 
-  ch3 = control->channels[CHANNEL3];
-  if (engineOn) {
-    if (ch3 < ENGINE_OFF_THRESHOLD)
-      engineOn = false;
-  } else if (ch3 > ENGINE_ON_THRESHOLD) {
-    engineOn = true;
-  }
-
-  if (engineOn) {
-    engine = map(
-      constrain(ch3, ENGINE_POWER_MIN, ENGINE_POWER_MAX),
+  analogWrite(
+    CHANNEL3_PIN,
+    map(
+      constrain(control->channels[CHANNEL3], ENGINE_POWER_MIN, ENGINE_POWER_MAX),
       ENGINE_POWER_MIN, ENGINE_POWER_MAX, 0, 255
-    );
-  } else {
-    engine = 0;
-  }
-  analogWrite(CHANNEL3_PIN, engine);
+    )
+  );
 }
 
 void sendStatus() {
