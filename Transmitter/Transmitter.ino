@@ -732,7 +732,7 @@ void controlScreen(unsigned long now) {
         axis = screenNum - SCREEN_TRIMMING_A_X;
         addWithConstrain(
           settings.axes[axis].trimming,
-          settingsValueChange * 10,
+          settingsValueChange * 5,
           TRIMMING_MIN,
           TRIMMING_MAX
         );
