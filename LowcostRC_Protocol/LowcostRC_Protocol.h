@@ -5,7 +5,7 @@ const size_t PACKET_SIZE = 16;
 
 enum PacketType {
   PACKET_TYPE_CONTROL = 0x0a01,
-  PACKET_TYPE_STATUS = 0x0a02,
+  PACKET_TYPE_TELEMETRY = 0x0a02,
   PACKET_TYPE_SET_RF_CHANNEL = 0x0a03,
   PACKET_TYPE_COMMAND = 0x0a04
 };
@@ -19,6 +19,8 @@ enum ChannelN {
   CHANNEL2,
   CHANNEL3,
   CHANNEL4,
+  CHANNEL5,
+  CHANNEL6,
   NUM_CHANNELS,
   NO_CHANNEL = -1
 };
@@ -34,7 +36,7 @@ struct ControlPacket {
   int channels[NUM_CHANNELS];
 };
 
-struct StatusPacket{
+struct TelemetryPacket{
   PacketType packetType;
   int battaryMV;
 };

@@ -33,7 +33,7 @@ const ControlPacket DEFAULT_NOLINK_CONTROL = {
 
 unsigned int battaryMV = 0;
 unsigned long controlTime,
-              sendStatusTime;
+              sendTelemetryTime;
 
 Servo channel1Servo, channel2Servo;
 RF24 radio(RADIO_CE_PIN, RADIO_CSN_PIN);
@@ -89,7 +89,7 @@ void setup(void) {
   radio.startListening();
 
   controlTime = 0;
-  sendStatusTime = 0;
+  sendTelemetryTime = 0;
 }
 
 void loop(void) {
@@ -98,9 +98,9 @@ void loop(void) {
   static int lastChannels[NUM_CHANNELS];
   static bool hasLastChannels = false;
 
-  if (now - sendStatusTime > 5000) {
-    sendStatus();
-    sendStatusTime = now;
+  if (now - sendTelemetryTime > 5000) {
+    sendTelemetry();
+    sendTelemetryTime = now;
   }
 
   if (radio.available()) {
@@ -171,17 +171,17 @@ void applyControl(ControlPacket *control) {
   );
 }
 
-void sendStatus() {
-  struct StatusPacket status;
+void sendTelemetry() {
+  struct TelemetryPacket telemetry;
 
-  status.packetType = PACKET_TYPE_STATUS;
+  telemetry.packetType = PACKET_TYPE_TELEMETRY;
 
   updateBattaryVoltage();
   PRINT(F("battaryMV: "));
   PRINTLN(battaryMV);
-  status.battaryMV = battaryMV;
+  telemetry.battaryMV = battaryMV;
 
-  radio.writeAckPayload(1, &status, sizeof(status));
+  radio.writeAckPayload(1, &telemetry, sizeof(telemetry));
 }
 
 unsigned long vHist[5] = {0, 0, 0, 0, 0};

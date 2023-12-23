@@ -15,7 +15,8 @@
 #define RADIO_CSN_PIN 10
 
 #define BEEP_PIN 3
-#define BEEP_FREQ 1320
+#define BEEP_LOW_HZ (2 * 440)
+#define BEEP_HIGH_HZ (5 * 440)
 #define SETTINGS_PIN 6
 #define SETTINGS_PLUS_PIN 7
 #define SETTINGS_MINUS_PIN 8
@@ -24,7 +25,7 @@
 #define VOLT_METER_R1 10000L
 #define VOLT_METER_R2 10000L
 
-#define SETTINGS_MAGICK 0x5556
+#define SETTINGS_MAGICK 0x5558
 #define PROFILES_ADDR 0
 #define NUM_PROFILES 5
 
@@ -47,13 +48,29 @@ struct AxisSettings {
   ChannelN channel;
 };
 
+enum Switch {
+  SWITCH_1,
+  SWITCH_2,
+  SWITCHES_COUNT,
+};
+
+int switchPins[] = {4, 5};
+
+struct SwitchesSettings {
+  int low, high;
+  ChannelN channel;
+};
+
 struct Settings {
   int magick;
   int rfChannel;
+  int battaryLowMV;
   AxisSettings axes[AXES_COUNT];
+  SwitchesSettings switches[SWITCHES_COUNT];
 };
 
-const int DEFAULT_JOY_CENTER = 512,
+const int DEFAULT_BATTARY_LOW_MV = 3400,
+          DEFAULT_JOY_CENTER = 512,
           DEFAULT_JOY_THRESHOLD = 1;
 const bool DEFAULT_JOY_INVERT = false;
 const int CENTER_PULSE = 1500,
@@ -62,11 +79,17 @@ const int CENTER_PULSE = 1500,
           DUAL_RATE_MIN = 10,
           DUAL_RATE_MAX = 1500,
           TRIMMING_MIN = -1500,
-          TRIMMING_MAX = 1500;
+          TRIMMING_MAX = 1500,
+          SWITCH_MIN = 0,
+          SWITCH_MAX = 3000,
+          DEFAULT_SWITCH_LOW = 1000,
+          DEFAULT_SWITCH_HIGH = 2000;
 
 const Settings defaultSettings PROGMEM = {
   SETTINGS_MAGICK,
   DEFAULT_RF_CHANNEL,
+  DEFAULT_BATTARY_LOW_MV,
+  // axes
   {
     {
       DEFAULT_JOY_CENTER,
@@ -100,6 +123,19 @@ const Settings defaultSettings PROGMEM = {
       DEFAULT_TRIMMING,
       CHANNEL4
     }
+  },
+  // switches
+  {
+    {
+      DEFAULT_SWITCH_LOW,
+      DEFAULT_SWITCH_HIGH,
+      CHANNEL5
+    },
+    {
+      DEFAULT_SWITCH_LOW,
+      DEFAULT_SWITCH_HIGH,
+      CHANNEL6
+    }
   }
 };
 
@@ -129,6 +165,13 @@ enum Screen {
   SCREEN_CHANNEL_A_Y,
   SCREEN_CHANNEL_B_X,
   SCREEN_CHANNEL_B_Y,
+  SCREEN_LOW_SWITCH_1,
+  SCREEN_LOW_SWITCH_2,
+  SCREEN_HIGH_SWITCH_1,
+  SCREEN_HIGH_SWITCH_2,
+  SCREEN_CHANNEL_SWITCH_1,
+  SCREEN_CHANNEL_SWITCH_2,
+  SCREEN_BATTARY_LOW,
   SCREEN_SAVE_FOR_NOLINK,
   SCREEN_SAVE,
   FIRST_SCREEN = NO_SCREEN,
@@ -145,12 +188,13 @@ bool statusRadioSuccess = false,
      statusRadioFailure = false,
      beepState = false,
      settingsLongPress = false;
-int beepDuration = 0,
+int beepFreq = BEEP_LOW_HZ,
+    beepDuration = 0,
     beepPause = 0,
     beepCount = 0;
 Screen screenNum = NO_SCREEN;
 
-struct StatusPacket status;
+struct TelemetryPacket telemetry;
 
 RF24 radio(RADIO_CE_PIN, RADIO_CSN_PIN);
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
@@ -203,6 +247,9 @@ void setup(void)
 
   for (int axis = 0; axis < AXES_COUNT; axis++) {
     pinMode(joystickPins[axis], INPUT);
+  }
+  for (int sw = 0; sw < SWITCHES_COUNT; sw++) {
+    pinMode(switchPins[sw], INPUT_PULLUP);
   }
 
   buttons.begin();
@@ -320,6 +367,12 @@ void controlLoop(unsigned long now) {
       rp.control.channels[channel] = readAxis(axis);
     }
   }
+  for (int sw = 0; sw < SWITCHES_COUNT; sw++) {
+    ChannelN channel = settings.switches[sw].channel;
+    if (channel != NO_CHANNEL) {
+      rp.control.channels[channel] = readSwitch(sw);
+    }
+  }
 
   for (int channel = 0; channel < NUM_CHANNELS; channel++)
     isChanged = isChanged || rp.control.channels[channel] != prevChannels[channel];
@@ -339,17 +392,22 @@ void controlLoop(unsigned long now) {
     PRINT(F("; ch3: "));
     PRINT(rp.control.channels[CHANNEL3]);
     PRINT(F("; ch4: "));
-    PRINTLN(rp.control.channels[CHANNEL4]);
+    PRINT(rp.control.channels[CHANNEL4]);
+    PRINT(F("; ch5: "));
+    PRINT(rp.control.channels[CHANNEL5]);
+    PRINT(F("; ch6: "));
+    PRINTLN(rp.control.channels[CHANNEL6]);
 
     sendRequest(now, &rp);
   }
 
   if (radio.isAckPayloadAvailable()) {
-    radio.read(&status, sizeof(status));
-    if (status.packetType == PACKET_TYPE_STATUS) {
+    radio.read(&telemetry, sizeof(telemetry));
+    if (telemetry.packetType == PACKET_TYPE_TELEMETRY) {
       PRINT(F("battaryMV: "));
-      PRINTLN(status.battaryMV);
-      if (status.battaryMV < 3400) {
+      PRINTLN(telemetry.battaryMV);
+      if (telemetry.battaryMV < settings.battaryLowMV) {
+        beepFreq = BEEP_LOW_HZ;
         beepCount = 3;
         beepDuration = 200;
         beepPause = 100;
@@ -380,6 +438,7 @@ void sendRequest(unsigned long now, union RequestPacket *packet) {
     statusRadioFailure = true;
     statusRadioSuccess = false;
     
+    beepFreq = BEEP_HIGH_HZ;
     beepCount = 1;
     beepDuration = 5;
     beepPause = 5;
@@ -393,6 +452,7 @@ void sendRequest(unsigned long now, union RequestPacket *packet) {
   prevStatusRadioFailure = statusRadioFailure;
 
   if (isStatusChanged && statusRadioSuccess) {
+    beepFreq = BEEP_LOW_HZ;
     beepCount = 1;
     beepDuration = 50;
     beepPause = 50;
@@ -459,6 +519,13 @@ void setJoystickCenter() {
   PRINTLN(F("DONE"));
 }
 
+int readSwitch(Switch sw) {
+  return (
+    (digitalRead(switchPins[sw]) == LOW) ?
+    settings.switches[sw].high : settings.switches[sw].low
+  );
+}
+
 unsigned long vHist[5] = {0, 0, 0, 0, 0};
 byte vHistPos = 0;
 
@@ -520,7 +587,7 @@ void controlBeep(unsigned long now) {
     } 
   }
   if (beepState) {
-    tone(BEEP_PIN, BEEP_FREQ);
+    tone(BEEP_PIN, beepFreq);
   } else {
     noTone(BEEP_PIN);
   }
@@ -530,8 +597,10 @@ void redrawScreen() {
   char text[50] = "",
        yStr[] = "y",
        nStr[] = "n",
-       axisNames[][3] = {"AX", "AY", "BX", "BY"};
+       axisNames[][3] = {"AX", "AY", "BX", "BY"},
+       switchNames[][4] = {"SW1", "SW2"};
   Axis axis;
+  Switch sw;
 
   display.fillRect(0, 0, 128, 64, BLACK);
 
@@ -544,8 +613,8 @@ void redrawScreen() {
         PSTR("Battary\nT: %d.%03dV\nR: %d.%03dV"),
         thisBattaryMV / 1000,
         thisBattaryMV % 1000,
-        status.battaryMV / 1000,
-        status.battaryMV % 1000
+        telemetry.battaryMV / 1000,
+        telemetry.battaryMV % 1000
       );
       break;
     case SCREEN_PROFILE:
@@ -628,6 +697,52 @@ void redrawScreen() {
         );
       }
       break;
+    case SCREEN_LOW_SWITCH_1:
+    case SCREEN_LOW_SWITCH_2:
+      sw = screenNum - SCREEN_LOW_SWITCH_1;
+      sprintf_P(
+        text,
+        PSTR("Low %s\n%d"),
+        switchNames[sw],
+        settings.switches[sw].low
+      );
+      break;
+    case SCREEN_HIGH_SWITCH_1:
+    case SCREEN_HIGH_SWITCH_2:
+      sw = screenNum - SCREEN_HIGH_SWITCH_1;
+      sprintf_P(
+        text,
+        PSTR("High %s\n%d"),
+        switchNames[sw],
+        settings.switches[sw].high
+      );
+      break;
+    case SCREEN_CHANNEL_SWITCH_1:
+    case SCREEN_CHANNEL_SWITCH_2:
+      sw = screenNum - SCREEN_CHANNEL_SWITCH_1;
+      if (settings.switches[sw].channel != NO_CHANNEL) {
+        sprintf_P(
+          text,
+          PSTR("Ch %s\n%d"),
+          switchNames[sw],
+          settings.switches[sw].channel + 1
+        );
+      } else {
+        sprintf_P(
+          text,
+          PSTR("Channel %s\nNone"),
+          switchNames[sw]
+        );
+      }
+      break;
+    case SCREEN_BATTARY_LOW:
+      sprintf_P(
+        text,
+        PSTR("Bat low\n%d.%03dV"),
+        settings.battaryLowMV /1000,
+        settings.battaryLowMV % 1000
+      );
+      break;
     case SCREEN_SAVE_FOR_NOLINK:
       sprintf_P(
         text,
@@ -653,6 +768,7 @@ void controlScreen(unsigned long now) {
   int settingsValueChange = 0;
   Screen prevScreenNum = screenNum;
   Axis axis;
+  Switch sw;
 
   buttons.handle();
 
@@ -691,6 +807,9 @@ void controlScreen(unsigned long now) {
           (settingsValueChange > 0) ?
           COMMAND_USER_COMMAND1 : COMMAND_USER_COMMAND2
         );
+        beepFreq = BEEP_LOW_HZ;
+        beepCount = 1;
+        beepDuration = 250;
         break;
       case SCREEN_PROFILE:
         addWithConstrain(
@@ -708,7 +827,7 @@ void controlScreen(unsigned long now) {
         break;
       case SCREEN_AUTO_CENTER:
         if (settingsValueChange > 0) {
-          tone(BEEP_PIN, BEEP_FREQ);
+          tone(BEEP_PIN, BEEP_LOW_HZ);
           setJoystickCenter();
           noTone(BEEP_PIN);
         }
@@ -756,9 +875,48 @@ void controlScreen(unsigned long now) {
           NUM_CHANNELS - 1
         );
         break;
+      case SCREEN_LOW_SWITCH_1:
+      case SCREEN_LOW_SWITCH_2:
+        sw = screenNum - SCREEN_LOW_SWITCH_1;
+        addWithConstrain(
+          settings.switches[sw].low,
+          settingsValueChange * 50,
+          SWITCH_MIN,
+          SWITCH_MAX
+        );
+        break;
+      case SCREEN_HIGH_SWITCH_1:
+      case SCREEN_HIGH_SWITCH_2:
+        sw = screenNum - SCREEN_HIGH_SWITCH_1;
+        addWithConstrain(
+          settings.switches[sw].high,
+          settingsValueChange * 50,
+          SWITCH_MIN,
+          SWITCH_MAX
+        );
+        break;
+      case SCREEN_CHANNEL_SWITCH_1:
+      case SCREEN_CHANNEL_SWITCH_2:
+        sw = screenNum - SCREEN_CHANNEL_SWITCH_1;
+        addWithConstrain(
+          settings.switches[sw].channel,
+          settingsValueChange,
+          NO_CHANNEL,
+          NUM_CHANNELS - 1
+        );
+        break;
+      case SCREEN_BATTARY_LOW:
+        addWithConstrain(
+          settings.battaryLowMV,
+          settingsValueChange * 100,
+          100,
+          20000
+        );
+        break;
       case SCREEN_SAVE_FOR_NOLINK:
         if (settingsValueChange > 0) {
           sendCommand(now, COMMAND_SAVE_FOR_NOLINK);
+          beepFreq = BEEP_LOW_HZ;
           beepCount = 1;
           beepDuration = 250;
         }
@@ -767,6 +925,7 @@ void controlScreen(unsigned long now) {
         screenNum = NO_SCREEN;
         if (settingsValueChange > 0) {
           saveProfile();
+          beepFreq = BEEP_LOW_HZ;
           beepCount = 1;
           beepDuration = 500;
         }

@@ -21,7 +21,7 @@ const ControlPacket DEFAULT_NOLINK_CONTROL = {
 };
 
 unsigned long controlTime,
-              sendStatusTime;
+              sendTelemetryTime;
 
 RF24 radio(RADIO_CE_PIN, RADIO_CSN_PIN);
 byte pipe[7];
@@ -85,7 +85,7 @@ void setup(void) {
   radio.startListening();
 
   controlTime = 0;
-  sendStatusTime = 0;
+  sendTelemetryTime = 0;
 }
 
 void loop(void) {
@@ -95,9 +95,9 @@ void loop(void) {
   static bool hasLastChannels = false;
 
 
-  if (now - sendStatusTime > 5000) {
-    sendStatus();
-    sendStatusTime = now;
+  if (now - sendTelemetryTime > 5000) {
+    sendTelemetry();
+    sendTelemetryTime = now;
   }
 
   if (radio.available()) {
@@ -164,12 +164,12 @@ void applyControl(ControlPacket *control) {
   Joystick.sendState();
 }
 
-void sendStatus() {
-  struct StatusPacket status;
+void sendTelemetry() {
+  struct TelemetryPacket telemetry;
 
-  status.packetType = PACKET_TYPE_STATUS;
-  status.battaryMV = 5000;
-  radio.writeAckPayload(1, &status, sizeof(status));
+  telemetry.packetType = PACKET_TYPE_TELEMETRY;
+  telemetry.battaryMV = 5000;
+  radio.writeAckPayload(1, &telemetry, sizeof(telemetry));
 }
 
 // vim:ai:sw=2:et

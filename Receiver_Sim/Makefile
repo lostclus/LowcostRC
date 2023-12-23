@@ -1,4 +1,4 @@
-BOARD=arduino:avr:promicro
+BOARD=arduino:avr:micro
 PORT=/dev/ttyUSB0
 
 compile:

@@ -96,7 +96,7 @@ int beepDuration = 0,
     beepPause = 0,
     beepCount = 0;
 
-struct StatusPacket status;
+struct TelemetryPacket telemetry;
 
 RF24 radio(RADIO_CE_PIN, RADIO_CSN_PIN);
 
@@ -267,11 +267,11 @@ void controlLoop(unsigned long now) {
   }
 
   if (radio.isAckPayloadAvailable()) {
-    radio.read(&status, sizeof(status));
-    if (status.packetType == PACKET_TYPE_STATUS) {
+    radio.read(&telemetry, sizeof(telemetry));
+    if (telemetry.packetType == PACKET_TYPE_TELEMETRY) {
       PRINT(F("battaryMV: "));
-      PRINTLN(status.battaryMV);
-      if (status.battaryMV < 3400) {
+      PRINTLN(telemetry.battaryMV);
+      if (telemetry.battaryMV < 3400) {
         beepCount = 3;
         beepDuration = 200;
         beepPause = 100;
