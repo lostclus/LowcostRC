@@ -406,7 +406,7 @@ void controlLoop(unsigned long now) {
     if (telemetry.packetType == PACKET_TYPE_TELEMETRY) {
       PRINT(F("battaryMV: "));
       PRINTLN(telemetry.battaryMV);
-      if (telemetry.battaryMV < settings.battaryLowMV) {
+      if (telemetry.battaryMV > 0 && telemetry.battaryMV < settings.battaryLowMV) {
         beepFreq = BEEP_LOW_HZ;
         beepCount = 3;
         beepDuration = 200;
@@ -440,8 +440,8 @@ void sendRequest(unsigned long now, union RequestPacket *packet) {
     
     beepFreq = BEEP_HIGH_HZ;
     beepCount = 1;
-    beepDuration = 5;
-    beepPause = 5;
+    beepDuration = 3;
+    beepPause = 3;
   }
 
   isStatusChanged = (
@@ -454,8 +454,8 @@ void sendRequest(unsigned long now, union RequestPacket *packet) {
   if (isStatusChanged && statusRadioSuccess) {
     beepFreq = BEEP_LOW_HZ;
     beepCount = 1;
-    beepDuration = 50;
-    beepPause = 50;
+    beepDuration = 30;
+    beepPause = 30;
   }
 }
 
