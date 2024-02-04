@@ -1,9 +1,8 @@
 BOARD=arduino:avr:micro
-PORT=/dev/ttyUSB0
+PORT=/dev/ttyACM0
 
 compile:
 	arduino-cli compile \
-		-b $(BOARD) \
 		-b "$(BOARD)" \
 		.
 
@@ -13,3 +12,5 @@ upload:
 		-b "$(BOARD)" \
 		-p $(PORT) \
 		.
+
+install: compile upload
