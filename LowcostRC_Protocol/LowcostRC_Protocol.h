@@ -1,20 +1,27 @@
+#ifndef LowcostRC_Protocol_h
+#define LowcostRC_Protocol_h
+
+#include <stdint.h>
+
 const int DEFAULT_RF_CHANNEL = 76;
 const size_t PACKET_SIZE = 16;
 
 #define PIPE_FORMAT "lcr%03d"
 
-enum PacketType {
+enum PacketTypeEnum {
   PACKET_TYPE_CONTROL = 0x0a01,
   PACKET_TYPE_TELEMETRY = 0x0a02,
   PACKET_TYPE_SET_RF_CHANNEL = 0x0a03,
   PACKET_TYPE_COMMAND = 0x0a04
 };
 
+typedef uint16_t PacketType;
+
 struct GenericPacket {
   PacketType packetType;
 };
 
-enum ChannelN {
+enum ChannelNEnum {
   CHANNEL1,
   CHANNEL2,
   CHANNEL3,
@@ -25,25 +32,29 @@ enum ChannelN {
   NO_CHANNEL = -1
 };
 
-enum Command {
+typedef uint16_t ChannelN;
+
+enum CommandEnum {
   COMMAND_SAVE_FOR_NOLINK,
   COMMAND_USER_COMMAND1,
   COMMAND_USER_COMMAND2
 };
 
+typedef uint16_t Command;
+
 struct ControlPacket {
   PacketType packetType;
-  int channels[NUM_CHANNELS];
+  uint16_t channels[NUM_CHANNELS];
 };
 
 struct TelemetryPacket{
   PacketType packetType;
-  int battaryMV;
+  uint16_t battaryMV;
 };
 
 struct SetRFChannelPacket{
   PacketType packetType;
-  int rfChannel;
+  uint16_t rfChannel;
 };
 
 struct CommandPacket{
@@ -58,4 +69,5 @@ union RequestPacket {
   struct CommandPacket command;
 };
 
+#endif // LowcostRC_Protocol_h
 // vim:ai:sw=2:et

@@ -1,18 +1,16 @@
 #include <string.h>
 #include <EEPROM.h>
-#include <RF24.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <AbleButtons.h>
 
 #include <LowcostRC_Protocol.h>
+#include <LowcostRC_Console.h>
 
-#undef WITH_CONSOLE
-#define WITH_CONSOLE
-
-#define RADIO_CE_PIN 9
-#define RADIO_CSN_PIN 10
+#include "Radio.h"
+#include "Radio_NRF24.h"
+#include "Radio_SPI.h"
 
 #define BEEP_PIN 3
 #define BEEP_LOW_HZ (2 * 440)
@@ -196,7 +194,10 @@ Screen screenNum = NO_SCREEN;
 
 struct TelemetryPacket telemetry;
 
-RF24 radio(RADIO_CE_PIN, RADIO_CSN_PIN);
+BaseRadioModule *radio;
+NRF24RadioModule nrf24Radio;
+SPIRadioModule spiRadio;
+
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
 
 using Button = AblePullupClickerButton;
@@ -213,19 +214,10 @@ Button *buttonsArray[] = {
 };
 ButtonList buttons(buttonsArray);
 
-#ifdef WITH_CONSOLE
-#define PRINT(x) Serial.print(x)
-#define PRINTLN(x) Serial.println(x)
-#else
-#define PRINT(x) __asm__ __volatile__ ("nop\n\t")
-#define PRINTLN(x) __asm__ __volatile__ ("nop\n\t")
-#endif
-
 #define addWithConstrain(value, delta, lo, hi) value = constrain(value + (delta), lo, hi)
 
 bool loadProfile();
 void saveProfile();
-void setRFChannel(int rfChannel);
 void sendRFChannel(unsigned long now, int rfChannel);
 void sendCommand(unsigned long now);
 void controlLoop(unsigned long now);
@@ -266,16 +258,16 @@ void setup(void)
   if (!loadProfile())
     needsSetJoystickCenter = true;
 
-  if (radio.begin()) {
-    PRINTLN(F("Radio init: OK"));
-  } else {
-    PRINTLN("Radio init: FAILURE");
-  }
-  radio.setRadiation(RF24_PA_MAX, RF24_250KBPS);
-  radio.setPayloadSize(PACKET_SIZE);
-  radio.enableAckPayload();
+  radio = &nrf24Radio;
 
-  setRFChannel(settings.rfChannel);
+  if (nrf24Radio.begin()) {
+    radio = &nrf24Radio;
+  } else {
+    spiRadio.begin();
+    radio = &spiRadio;
+  }
+
+  radio->setRFChannel(settings.rfChannel);
 
   if (needsSetJoystickCenter) {
     setJoystickCenter();
@@ -325,17 +317,6 @@ bool loadProfile() {
 
 void saveProfile() {
   EEPROM.put(PROFILES_ADDR + currentProfile * SETTINGS_SIZE, settings);
-}
-
-void setRFChannel(int rfChannel) {
-  byte pipe[7];
-
-  radio.setChannel(rfChannel);
-  sprintf_P(pipe, PSTR(PIPE_FORMAT), rfChannel);
-  radio.openWritingPipe(pipe);
-
-  PRINT(F("RF channel: "));
-  PRINTLN(rfChannel);
 }
 
 void sendRFChannel(unsigned long now, int rfChannel) {
@@ -401,17 +382,14 @@ void controlLoop(unsigned long now) {
     sendRequest(now, &rp);
   }
 
-  if (radio.isAckPayloadAvailable()) {
-    radio.read(&telemetry, sizeof(telemetry));
-    if (telemetry.packetType == PACKET_TYPE_TELEMETRY) {
-      PRINT(F("battaryMV: "));
-      PRINTLN(telemetry.battaryMV);
-      if (telemetry.battaryMV > 0 && telemetry.battaryMV < settings.battaryLowMV) {
-        beepFreq = BEEP_LOW_HZ;
-        beepCount = 3;
-        beepDuration = 200;
-        beepPause = 100;
-      }
+  if (radio->receive(&telemetry)) {
+    PRINT(F("battaryMV: "));
+    PRINTLN(telemetry.battaryMV);
+    if (telemetry.battaryMV > 0 && telemetry.battaryMV < settings.battaryLowMV) {
+      beepFreq = BEEP_LOW_HZ;
+      beepCount = 3;
+      beepDuration = 200;
+      beepPause = 100;
     }
   }
 }
@@ -426,7 +404,7 @@ void sendRequest(unsigned long now, union RequestPacket *packet) {
   PRINT(F("; size: "));
   PRINTLN(sizeof(*packet));
 
-  radioOK = radio.write(packet, sizeof(*packet));
+  radioOK = radio->send(packet);
   if (radioOK) {
     requestSendTime = now;
     errorTime = 0;
@@ -816,14 +794,14 @@ void controlScreen(unsigned long now) {
           currentProfile, settingsValueChange, 0, NUM_PROFILES - 1
         );
         loadProfile();
-        setRFChannel(settings.rfChannel);
+        radio->setRFChannel(settings.rfChannel);
         break;
       case SCREEN_RF_CHANNEL:
         addWithConstrain(
           settings.rfChannel, settingsValueChange, 0, 125
         );
         sendRFChannel(now, settings.rfChannel);
-        setRFChannel(settings.rfChannel);
+        radio->setRFChannel(settings.rfChannel);
         break;
       case SCREEN_AUTO_CENTER:
         if (settingsValueChange > 0) {

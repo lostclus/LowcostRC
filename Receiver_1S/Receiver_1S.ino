@@ -3,9 +3,7 @@
 #include <Servo.h>
 
 #include <LowcostRC_Protocol.h>
-
-#undef WITH_CONSOLE
-//define WITH_CONSOLE
+#include <LowcostRC_Console.h>
 
 #define RESET_RF_CHANNEL_PIN 2
 
@@ -38,14 +36,6 @@ unsigned long controlTime,
 Servo channel1Servo, channel2Servo;
 RF24 radio(RADIO_CE_PIN, RADIO_CSN_PIN);
 byte pipe[7];
-
-#ifdef WITH_CONSOLE
-#define PRINT(x) Serial.print(x)
-#define PRINTLN(x) Serial.println(x)
-#else
-#define PRINT(x) __asm__ __volatile__ ("nop\n\t")
-#define PRINTLN(x) __asm__ __volatile__ ("nop\n\t")
-#endif
 
 void setup(void) {
   int rfChannel = DEFAULT_RF_CHANNEL;
