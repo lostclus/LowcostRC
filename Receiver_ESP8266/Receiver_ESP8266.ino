@@ -11,6 +11,7 @@ RequestPacket rp;
 TelemetryPacket telemetry;
 unsigned long controlTime,
               sendTelemetryTime;
+int currentChannel = 7;
 
 void sendTelemetry(uint8_t *mac) {
   telemetry.packetType = PACKET_TYPE_TELEMETRY;
@@ -52,6 +53,15 @@ void OnDataRecv(uint8_t * mac,  uint8_t *incomingData, uint8_t len) {
     }
 
     digitalWrite(LED_BUILTIN, HIGH);
+  } else if (rp.generic.packetType == PACKET_TYPE_SET_RF_CHANNEL) {
+    currentChannel = (rp.rfChannel.rfChannel % 10) + 1;
+    PRINT("New channel: ");
+    PRINTLN(currentChannel);
+    if (!esp_now_is_peer_exist(mac)) {
+      esp_now_add_peer(mac, ESP_NOW_ROLE_COMBO, currentChannel, NULL, 0);
+    } else {
+      esp_now_set_peer_channel(mac, currentChannel);
+    }
   }
 }
 

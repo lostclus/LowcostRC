@@ -9,29 +9,47 @@
 
 #define ESP_OK 0
 
-const int addressBookLength = 5;
-uint8_t addressBook[addressBookLength][6] = {
+const int peersCount = 12;
+const size_t addressSize = 6;
+const int channelsCount = 10;
+
+uint8_t peerAddress[peersCount][addressSize] = {
   // {0x80, 0x7d, 0x3A, 0x7f, 0xdd, 0xf6},
+  {0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0},
+  {0, 0, 0, 0, 0, 0},
   {0x24, 0xd7, 0xeb, 0xc8, 0xd4, 0x59},
   {0, 0, 0, 0, 0, 0},
   {0, 0, 0, 0, 0, 0},
   {0, 0, 0, 0, 0, 0},
   {0, 0, 0, 0, 0, 0}
 };
-int curAddressNum = 0;
+int currentPeer = 0,
+    currentChannel = 1;
 
 TelemetryPacket telemetry;
 
 
-bool hasAddressBookRecord(int n) {
-  return (addressBook[n][0] != 0 && addressBook[n][1] != 0);
+bool hasAddress(int peer) {
+  for (int i = 0; i < addressSize; i++)
+    if (peerAddress[peer][i] != 0) return true;
+  return false;
 }
 
 void onSPIStatus(uint32_t status) {
-  if (status >= STATUS_SET_RF_CHANNEL && status < STATUS_SET_RF_CHANNEL + addressBookLength) {
-    curAddressNum = status - STATUS_SET_RF_CHANNEL;
-    PRINT("New address: #");
-    PRINTLN(curAddressNum);
+  if (status >= STATUS_SET_RF_CHANNEL && status < STATUS_SET_RF_CHANNEL + peersCount * channelsCount) {
+    int rfChannel = status - STATUS_SET_RF_CHANNEL;
+    currentPeer = rfChannel / 10;
+    currentChannel = (rfChannel % 10) + 1;
+    esp_now_set_peer_channel(peerAddress[currentPeer], currentChannel);
+    PRINT("New peer: #");
+    PRINTLN(currentPeer);
+    PRINT("New channel: #");
+    PRINTLN(currentChannel);
   }
 }
 
@@ -44,13 +62,13 @@ void onSPIDataRecv(uint8_t *data, size_t len) {
     return;
   }
 
-  if (!hasAddressBookRecord(curAddressNum)) {
+  if (!hasAddress(currentPeer)) {
     PRINTLN("No receiver address");
     SPISlave.setStatus(STATUS_FAILURE);
     return;
   }
 
-  if (esp_now_send(addressBook[curAddressNum], data, sizeof(RequestPacket)) != ESP_OK) {
+  if (esp_now_send(peerAddress[currentPeer], data, sizeof(RequestPacket)) != ESP_OK) {
     PRINTLN("Error sending data to the receiver");
     SPISlave.setStatus(STATUS_FAILURE);
   }
@@ -73,7 +91,7 @@ void onESPNowDataRecv(uint8_t * mac,  uint8_t *incomingData, uint8_t len) {
     return;
   }
 
-  if (memcmp(mac, addressBook[curAddressNum], sizeof(addressBook[0])) != 0) {
+  if (memcmp(mac, peerAddress[currentPeer], sizeof(peerAddress[0])) != 0) {
     PRINTLN("ESP-NOW: Invalid sender address");
     return;
   }
@@ -111,9 +129,9 @@ void setup() {
   esp_now_register_recv_cb(onESPNowDataRecv);
   esp_now_register_send_cb(onESPNowDataSent);
 
-  for (int i=0; i < addressBookLength; i++)
-    if (hasAddressBookRecord(i))
-      esp_now_add_peer(addressBook[i], ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
+  for (int peer=0; peer < peersCount; peer++)
+    if (hasAddress(peer))
+      esp_now_add_peer(peerAddress[peer], ESP_NOW_ROLE_COMBO, 1, NULL, 0);
 
   SPISlave.onStatus(onSPIStatus);
   SPISlave.onData(onSPIDataRecv);
