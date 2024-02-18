@@ -1,6 +1,8 @@
 #ifndef LowcostRC_Console_h
 #define LowcostRC_Console_h
 
+#include <Arduino.h>
+
 #ifdef WITH_CONSOLE
 #define PRINT(x) Serial.print(x)
 #define PRINTLN(x) Serial.println(x)

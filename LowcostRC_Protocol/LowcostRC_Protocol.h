@@ -1,7 +1,7 @@
 #ifndef LowcostRC_Protocol_h
 #define LowcostRC_Protocol_h
 
-#include <stdint.h>
+#include <Arduino.h>
 
 const int DEFAULT_RF_CHANNEL = 76;
 const size_t PACKET_SIZE = 16;
