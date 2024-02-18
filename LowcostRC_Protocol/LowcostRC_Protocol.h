@@ -37,7 +37,9 @@ typedef uint16_t ChannelN;
 enum CommandEnum {
   COMMAND_SAVE_FOR_NOLINK,
   COMMAND_USER_COMMAND1,
-  COMMAND_USER_COMMAND2
+  COMMAND_USER_COMMAND2,
+  COMMAND_PAIR,
+  COMMAND_PAIRED
 };
 
 typedef uint16_t Command;
