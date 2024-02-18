@@ -68,6 +68,15 @@ void RadioControl::sendPacket(union RequestPacket *packet) {
 }
 
 void RadioControl::handle() {
+  unsigned long now = millis();
+
+  if (errorTime > 0 && now - errorTime > 250) {
+    statusRadioFailure = false;
+    errorTime = 0;
+  }
+  if (requestSendTime > 0 && now - requestSendTime > 250) {
+    statusRadioSuccess = false;
+  }
 }
 
 // vim:et:sw=2:ai

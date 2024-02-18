@@ -1,11 +1,11 @@
 #include <string.h>
 #include <LowcostRC_Console.h>
+#include "Config.h"
 #include "Radio_NRF24.h"
 
-const int RADIO_CE_PIN = 9;
-const int RADIO_CSN_PIN = 10;
-
-NRF24RadioModule::NRF24RadioModule() : rf24(RADIO_CE_PIN, RADIO_CSN_PIN) {
+NRF24RadioModule::NRF24RadioModule()
+  : rf24(RADIO_NRF24_CE_PIN, RADIO_NRF24_CSN_PIN)
+{
 }
 
 bool NRF24RadioModule::begin() {
@@ -46,3 +46,5 @@ bool NRF24RadioModule::receive(struct TelemetryPacket *telemetry) {
 bool NRF24RadioModule::send(union RequestPacket *packet) {
     return rf24.write(packet, sizeof(RequestPacket));
 }
+
+// vim:ai:sw=2:et

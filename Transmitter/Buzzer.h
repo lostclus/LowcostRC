@@ -6,7 +6,6 @@
 
 class Buzzer {
   private:
-    int pin;
     unsigned long beepTime;
     bool beepState;
     unsigned int beepFreq,
@@ -15,7 +14,7 @@ class Buzzer {
                  beepCount;
 
   public:
-    Buzzer(int pin);
+    Buzzer();
     void begin();
     void beep(
       unsigned int freq,

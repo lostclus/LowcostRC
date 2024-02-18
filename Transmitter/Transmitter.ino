@@ -1,4 +1,3 @@
-#include <LowcostRC_Protocol.h>
 #include <LowcostRC_Console.h>
 
 #include "Buzzer.h"
@@ -7,9 +6,7 @@
 #include "Control_Pannel.h"
 #include "Controls.h"
 
-#define BUZZER_PIN 3
-
-Buzzer buzzer(BUZZER_PIN);
+Buzzer buzzer;
 RadioControl radioControl(&buzzer);
 Settings settings;
 Controls controls(&settings, &buzzer, &radioControl);
@@ -23,7 +20,6 @@ void setup(void)
   Serial.begin(115200);
   #endif
   PRINTLN(F("Starting..."));
-
 
   buzzer.begin();
   radioControl.begin();
@@ -45,17 +41,6 @@ void loop(void) {
   controlPannel.handle();
   radioControl.handle();
   buzzer.handle();
-
-  /*
-  if (errorTime > 0 && now - errorTime > 250) {
-    statusRadioFailure = false;
-    errorTime = 0;
-  }
-  if (requestSendTime > 0 && now - requestSendTime > 250) {
-    statusRadioSuccess = false;
-  }
-  */
 }
-
 
 // vim:ai:sw=2:et

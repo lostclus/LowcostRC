@@ -1,5 +1,6 @@
 #include <LowcostRC_Console.h>
 #include "Battary.h"
+#include "Config.h"
 #include "Control_Pannel.h"
 
 const int DUAL_RATE_MIN = 10,
@@ -18,7 +19,7 @@ ControlPannel::ControlPannel(
   , buzzer(buzzer)
   , radioControl(radioControl)
   , controls(controls)
-  , display(128, 64, &Wire, -1)
+  , display(DISPLAY_WIDTH, DISPLAY_HEIGHT, &Wire, -1)
   , settingsButton(SETTINGS_PIN)
   , settingsPlusButton(SETTINGS_PLUS_PIN)
   , settingsMinusButton(SETTINGS_MINUS_PIN)

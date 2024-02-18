@@ -1,9 +1,9 @@
 #include <Arduino.h>
+#include "Config.h"
 #include "Buzzer.h"
 
-Buzzer::Buzzer(int pin)
-  : pin(pin)
-  , beepTime(0)
+Buzzer::Buzzer()
+  : beepTime(0)
   , beepState(false)
   , beepFreq(0)
   , beepDuration(0)
@@ -13,7 +13,7 @@ Buzzer::Buzzer(int pin)
 }
 
 void Buzzer::begin() {
-  pinMode(pin, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
 }
 
 void Buzzer::beep(
@@ -53,9 +53,9 @@ void Buzzer::handle() {
     } 
   }
   if (beepState) {
-    tone(pin, beepFreq);
+    tone(BUZZER_PIN, beepFreq);
   } else {
-    noTone(pin);
+    noTone(BUZZER_PIN);
   }
 }
 

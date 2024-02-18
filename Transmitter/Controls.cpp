@@ -1,12 +1,13 @@
 #include <Arduino.h>
 #include <LowcostRC_Protocol.h>
 #include <LowcostRC_Console.h>
+#include "Config.h"
 #include "Controls.h"
 
 const int CENTER_PULSE = 1500;
 
-const int joystickPins[] = {A1, A0, A3, A2};
-const int switchPins[] = {4, 5};
+const int joystickPins[] = JOYSTICK_PINS;
+const int switchPins[] = SWITCH_PINS;
 
 Controls::Controls(Settings *settings, Buzzer *buzzer, RadioControl *radioControl)
   : settings(settings)

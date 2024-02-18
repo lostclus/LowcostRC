@@ -11,10 +11,6 @@
 #include "Settings.h"
 #include "Controls.h"
 
-#define SETTINGS_PIN 6
-#define SETTINGS_PLUS_PIN 7
-#define SETTINGS_MINUS_PIN 8
-
 using Button = AblePullupClickerButton;
 using ButtonList = AblePullupClickerButtonList;
 
@@ -74,7 +70,10 @@ class ControlPannel {
     void redrawScreen();
   public:
     ControlPannel(
-      Settings *settings, Buzzer *buzzer, RadioControl *radioControl, Controls *controls
+      Settings *settings,
+      Buzzer *buzzer,
+      RadioControl *radioControl,
+      Controls *controls
     );
     void begin();
     void handle();

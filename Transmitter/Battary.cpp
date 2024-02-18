@@ -1,15 +1,12 @@
 #include <Arduino.h>
+#include "Config.h"
 #include "Battary.h"
 
-#define VOLT_METER_PIN A6
-#define VOLT_METER_R1 10000L
-#define VOLT_METER_R2 10000L
-
 unsigned long vHist[5] = {0, 0, 0, 0, 0};
-byte vHistPos = 0;
+uint8_t vHistPos = 0;
 
 unsigned int getBattaryVoltage() {
-  byte i, count = 0;
+  uint8_t i, count = 0;
   unsigned long vcc = 0, vpin, vsum = 0;
    
   // Read 1.1V reference against AVcc
