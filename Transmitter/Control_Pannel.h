@@ -1,9 +1,18 @@
 #ifndef Control_Pannel_h
 #define Control_Pannel_h
 
+#include "Config.h"
+
+#if defined(WITH_ADAFRUIT_SSD1306)
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#elif defined(WITH_SSD1306_ASCII)
+#include <Wire.h>
+#include <SSD1306Ascii.h>
+#include <SSD1306AsciiWire.h>
+#endif
+
 #include <AbleButtons.h>
 #include <LowcostRC_Protocol.h>
 #include "Buzzer.h"
@@ -58,7 +67,13 @@ class ControlPannel {
     RadioControl *radioControl;
     Controls *controls;
     unsigned int thisBattaryMV = 0;
+
+#if defined(WITH_ADAFRUIT_SSD1306)
     Adafruit_SSD1306 display;
+#elif defined(WITH_SSD1306_ASCII)
+    SSD1306AsciiWire display;
+#endif
+
     Button settingsButton,
            settingsPlusButton,
            settingsMinusButton;

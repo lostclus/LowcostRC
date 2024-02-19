@@ -1,6 +1,5 @@
 #include <LowcostRC_Console.h>
 #include "Battary.h"
-#include "Config.h"
 #include "Control_Pannel.h"
 
 const int DUAL_RATE_MIN = 10,
@@ -19,7 +18,11 @@ ControlPannel::ControlPannel(
   , buzzer(buzzer)
   , radioControl(radioControl)
   , controls(controls)
+#if defined(WITH_ADAFRUIT_SSD1306)
   , display(DISPLAY_WIDTH, DISPLAY_HEIGHT, &Wire, -1)
+#elif defined(WITH_SSD1306_ASCII)
+  , display()
+#endif
   , settingsButton(SETTINGS_PIN)
   , settingsPlusButton(SETTINGS_PLUS_PIN)
   , settingsMinusButton(SETTINGS_MINUS_PIN)
@@ -34,9 +37,21 @@ void ControlPannel::begin() {
   settingsPlusButton.setDebounceTime(20);
   settingsMinusButton.setDebounceTime(20);
 
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+#if defined(WITH_ADAFRUIT_SSD1306)
+  if (!display.begin(SSD1306_SWITCHCAPVCC, DISPLAY_ADDRESS)) {
+    PRINTLN(F("SSD1306 init FAIL"));
+  } else {
+    PRINTLN(F("SSD1306 init OK"));
+  };
   display.clearDisplay();
   display.display();
+#elif defined(WITH_SSD1306_ASCII)
+  Wire.begin();
+  Wire.setClock(400000L);
+  display.begin(&Adafruit128x64, DISPLAY_ADDRESS);
+  display.setFont(System5x7);
+  display.clear();
+#endif
 }
 
 void ControlPannel::redrawScreen() {
@@ -47,8 +62,6 @@ void ControlPannel::redrawScreen() {
        switchNames[][4] = {"SW1", "SW2"};
   Axis axis;
   Switch sw;
-
-  display.fillRect(0, 0, 128, 64, BLACK);
 
   switch (screenNum) {
     case NO_SCREEN:
@@ -203,11 +216,18 @@ void ControlPannel::redrawScreen() {
       break;
   }
 
+#if defined(WITH_ADAFRUIT_SSD1306)
+  display.fillRect(0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, BLACK);
   display.setTextSize(2);
   display.setTextColor(WHITE);
   display.setCursor(0, 0);
   display.println(text);
   display.display();
+#elif defined(WITH_SSD1306_ASCII)
+  display.set2X();
+  display.clear();
+  display.print(text);
+#endif
 }
 
 void ControlPannel::handle() {
