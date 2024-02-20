@@ -94,7 +94,9 @@ int Controls::readSwitch(Switch sw) {
 
 void Controls::handle() {
   union RequestPacket rp;
-  bool isChanged = false;
+  bool isChanged = false,
+       isPing,
+       isRetry;
   static int prevChannels[NUM_CHANNELS];
   unsigned long now = millis();
 
@@ -121,11 +123,25 @@ void Controls::handle() {
   for (int channel = 0; channel < NUM_CHANNELS; channel++)
     prevChannels[channel] = rp.control.channels[channel];
 
-  if (
-    isChanged
-    || (radioControl->requestSendTime > 0 && now - radioControl->requestSendTime > 1000)
-    || (radioControl->errorTime > 0 && now - radioControl->errorTime < 200)
-  ) {
+  isPing = (
+    radioControl->errorTime == 0
+    && radioControl->requestSendTime > 0
+    && now - radioControl->requestSendTime > 1000
+  );
+
+  isRetry = (
+    radioControl->errorTime > 0
+    && now - radioControl->errorTime < 150
+  );
+
+  if (isChanged || isPing || isRetry) {
+    PRINT(F("isChanged: "));
+    PRINT(isChanged);
+    PRINT(F("; isPing: "));
+    PRINT(isPing);
+    PRINT(F("; isRetry: "));
+    PRINTLN(isRetry);
+
     PRINT(F("ch1: "));
     PRINT(rp.control.channels[CHANNEL1]);
     PRINT(F("; ch2: "));
