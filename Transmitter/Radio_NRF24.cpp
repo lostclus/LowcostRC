@@ -10,11 +10,11 @@ NRF24RadioModule::NRF24RadioModule()
 
 bool NRF24RadioModule::begin() {
   if (!rf24.begin()) {
-    PRINTLN("NRF24: Init: FAILURE");
+    PRINTLN(F("NRF24: init: FAIL"));
     return false;
   }
 
-  PRINTLN(F("NRF24: Init: OK"));
+  PRINTLN(F("NRF24: init: OK"));
   rf24.setRadiation(RF24_PA_MAX, RF24_250KBPS);
   rf24.setPayloadSize(PACKET_SIZE);
   rf24.enableAckPayload();

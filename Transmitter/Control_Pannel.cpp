@@ -9,6 +9,69 @@ const int DUAL_RATE_MIN = 10,
           SWITCH_MIN = 0,
           SWITCH_MAX = 3000;
 
+#ifndef FLAT_MENU
+const Screen controlsMenu[] = {
+  SCREEN_AUTO_CENTER,
+  SCREEN_DUAL_RATE_A_X,
+  SCREEN_DUAL_RATE_A_Y,
+  SCREEN_DUAL_RATE_B_X,
+  SCREEN_DUAL_RATE_B_Y,
+  SCREEN_TRIMMING_A_X,
+  SCREEN_TRIMMING_A_Y,
+  SCREEN_TRIMMING_B_X,
+  SCREEN_TRIMMING_B_Y,
+  SCREEN_INVERT_A_X,
+  SCREEN_INVERT_A_Y,
+  SCREEN_INVERT_B_X,
+  SCREEN_INVERT_B_Y,
+  SCREEN_LOW_SWITCH_1,
+  SCREEN_LOW_SWITCH_2,
+  SCREEN_HIGH_SWITCH_1,
+  SCREEN_HIGH_SWITCH_2,
+  SCREEN_MENU_UP,
+  SCREEN_NULL
+};
+
+const Screen mappingMenu[] = {
+  SCREEN_CHANNEL_A_X,
+  SCREEN_CHANNEL_A_Y,
+  SCREEN_CHANNEL_B_X,
+  SCREEN_CHANNEL_B_Y,
+  SCREEN_CHANNEL_SWITCH_1,
+  SCREEN_CHANNEL_SWITCH_2,
+  SCREEN_MENU_UP,
+  SCREEN_NULL
+};
+
+const Screen peerMenu[] = {
+  SCREEN_BATTARY_LOW,
+  SCREEN_SAVE_FOR_NOLINK,
+  SCREEN_MENU_UP,
+  SCREEN_NULL
+};
+
+const Screen mainMenu[] = {
+  SCREEN_BLANK,
+  SCREEN_BATTARY,
+  SCREEN_PROFILE,
+  SCREEN_RF_CHANNEL,
+  SCREEN_GROUP_CONTROLS,
+  SCREEN_GROUP_MAPPING,
+  SCREEN_GROUP_PEER,
+  SCREEN_SAVE,
+  SCREEN_NULL
+};
+
+struct SubMenu {
+  Screen screen,
+         *subMenu;
+} subMenu[] = {
+  {SCREEN_GROUP_CONTROLS, controlsMenu},
+  {SCREEN_GROUP_MAPPING, mappingMenu},
+  {SCREEN_GROUP_PEER, peerMenu},
+};
+#endif
+
 #define addWithConstrain(value, delta, lo, hi) value = constrain(value + (delta), lo, hi)
 
 ControlPannel::ControlPannel(
@@ -29,6 +92,7 @@ ControlPannel::ControlPannel(
   , buttonsArray({&settingsButton, &settingsPlusButton, &settingsMinusButton})
   , buttons(buttonsArray)
 {
+  moveMenuTop();
 }
 
 void ControlPannel::begin() {
@@ -63,8 +127,8 @@ void ControlPannel::redrawScreen() {
   Axis axis;
   Switch sw;
 
-  switch (screenNum) {
-    case NO_SCREEN:
+  switch (currentScreen) {
+    case SCREEN_BLANK:
       break;
     case SCREEN_BATTARY:
       sprintf_P(
@@ -104,7 +168,7 @@ void ControlPannel::redrawScreen() {
     case SCREEN_DUAL_RATE_A_Y:
     case SCREEN_DUAL_RATE_B_X:
     case SCREEN_DUAL_RATE_B_Y:
-      axis = screenNum - SCREEN_DUAL_RATE_A_X;
+      axis = currentScreen - SCREEN_DUAL_RATE_A_X;
       sprintf_P(
         text,
         PSTR("D/R %s\n%d"),
@@ -116,7 +180,7 @@ void ControlPannel::redrawScreen() {
     case SCREEN_TRIMMING_A_Y:
     case SCREEN_TRIMMING_B_X:
     case SCREEN_TRIMMING_B_Y:
-      axis = screenNum - SCREEN_TRIMMING_A_X;
+      axis = currentScreen - SCREEN_TRIMMING_A_X;
       sprintf_P(
         text,
         PSTR("Tr %s\n%d"),
@@ -128,7 +192,7 @@ void ControlPannel::redrawScreen() {
     case SCREEN_INVERT_A_Y:
     case SCREEN_INVERT_B_X:
     case SCREEN_INVERT_B_Y:
-      axis = screenNum - SCREEN_INVERT_A_X;
+      axis = currentScreen - SCREEN_INVERT_A_X;
       sprintf_P(
         text,
         PSTR("Invert %s\n%s"),
@@ -136,11 +200,31 @@ void ControlPannel::redrawScreen() {
         settings->values.axes[axis].joyInvert ? yStr : nStr
       );
       break;
+    case SCREEN_LOW_SWITCH_1:
+    case SCREEN_LOW_SWITCH_2:
+      sw = currentScreen - SCREEN_LOW_SWITCH_1;
+      sprintf_P(
+        text,
+        PSTR("Low %s\n%d"),
+        switchNames[sw],
+        settings->values.switches[sw].low
+      );
+      break;
+    case SCREEN_HIGH_SWITCH_1:
+    case SCREEN_HIGH_SWITCH_2:
+      sw = currentScreen - SCREEN_HIGH_SWITCH_1;
+      sprintf_P(
+        text,
+        PSTR("High %s\n%d"),
+        switchNames[sw],
+        settings->values.switches[sw].high
+      );
+      break;
     case SCREEN_CHANNEL_A_X:
     case SCREEN_CHANNEL_A_Y:
     case SCREEN_CHANNEL_B_X:
     case SCREEN_CHANNEL_B_Y:
-      axis = screenNum - SCREEN_CHANNEL_A_X;
+      axis = currentScreen - SCREEN_CHANNEL_A_X;
       if (settings->values.axes[axis].channel != NO_CHANNEL) {
         sprintf_P(
           text,
@@ -156,29 +240,9 @@ void ControlPannel::redrawScreen() {
         );
       }
       break;
-    case SCREEN_LOW_SWITCH_1:
-    case SCREEN_LOW_SWITCH_2:
-      sw = screenNum - SCREEN_LOW_SWITCH_1;
-      sprintf_P(
-        text,
-        PSTR("Low %s\n%d"),
-        switchNames[sw],
-        settings->values.switches[sw].low
-      );
-      break;
-    case SCREEN_HIGH_SWITCH_1:
-    case SCREEN_HIGH_SWITCH_2:
-      sw = screenNum - SCREEN_HIGH_SWITCH_1;
-      sprintf_P(
-        text,
-        PSTR("High %s\n%d"),
-        switchNames[sw],
-        settings->values.switches[sw].high
-      );
-      break;
     case SCREEN_CHANNEL_SWITCH_1:
     case SCREEN_CHANNEL_SWITCH_2:
-      sw = screenNum - SCREEN_CHANNEL_SWITCH_1;
+      sw = currentScreen - SCREEN_CHANNEL_SWITCH_1;
       if (settings->values.switches[sw].channel != NO_CHANNEL) {
         sprintf_P(
           text,
@@ -214,6 +278,32 @@ void ControlPannel::redrawScreen() {
         PSTR("Save?")
       );
       break;
+#ifndef FLAT_MENU
+    case SCREEN_GROUP_CONTROLS:
+      sprintf_P(
+        text,
+        PSTR("Controls>")
+      );
+      break;
+    case SCREEN_GROUP_MAPPING:
+      sprintf_P(
+        text,
+        PSTR("Mapping>")
+      );
+      break;
+    case SCREEN_GROUP_PEER:
+      sprintf_P(
+        text,
+        PSTR("Peer>")
+      );
+      break;
+    case SCREEN_MENU_UP:
+      sprintf_P(
+        text,
+        PSTR("<")
+      );
+      break;
+#endif
   }
 
 #if defined(WITH_ADAFRUIT_SSD1306)
@@ -230,11 +320,76 @@ void ControlPannel::redrawScreen() {
 #endif
 }
 
+void ControlPannel::moveMenuTop() {
+#ifdef FLAT_MENU
+  currentScreen = FIRST_SCREEN;
+#else
+  menuStack[0] = mainMenu;
+  currentMenu = &menuStack[0];
+  currentMenuItem = *currentMenu;
+#endif
+}
+
+void ControlPannel::moveMenuForward() {
+#ifdef FLAT_MENU
+  if (currentScreen < LAST_SCREEN) {
+    currentScreen += 1;
+  } else {
+    currentScreen = FIRST_SCREEN;
+  }
+#else
+  currentMenuItem++;
+  if (*currentMenuItem == SCREEN_NULL) {
+    currentMenuItem = *currentMenu;
+  }
+#endif
+}
+
+#ifndef FLAT_MENU
+void ControlPannel::moveMenuDown() {
+  Screen *newMenu = NULL;
+
+  for (int i = 0; i < sizeof(subMenu) / sizeof(subMenu[0]); i++) {
+      if (subMenu[i].screen == *currentMenuItem) {
+        newMenu = subMenu[i].subMenu;
+        break;
+      }
+  }
+
+  if (newMenu == NULL) return;
+  currentMenu++;
+  *currentMenu = newMenu;
+  currentMenuItem = newMenu;
+}
+
+void ControlPannel::moveMenuUp() {
+  Screen prevMenu = SCREEN_NULL;
+
+  if (currentMenu == &menuStack[0]) return;
+
+  for (int i = 0; i < sizeof(subMenu) / sizeof(subMenu[0]); i++) {
+    if (subMenu[i].subMenu == *currentMenu) {
+      prevMenu = subMenu[i].screen;
+      break;
+    }
+  }
+
+  currentMenu--;
+  currentMenuItem = *currentMenu;
+  if (prevMenu != SCREEN_NULL) {
+    while (
+        *currentMenuItem != SCREEN_NULL
+        && *currentMenuItem != prevMenu
+    ) currentMenuItem++;
+  }
+}
+#endif
+
 void ControlPannel::handle() {
   int settingsValueChange = 0;
-  Screen prevScreenNum = screenNum;
   Axis axis;
   Switch sw;
+  Screen prevScreen = currentScreen;
   unsigned long now = millis();
 
   buttons.handle();
@@ -243,20 +398,19 @@ void ControlPannel::handle() {
     if (settingsLongPress) {
       settingsLongPress = false;
     } else {
-      screenNum = screenNum + ((Screen)1);
-      if (screenNum > LAST_SCREEN)
-        screenNum = FIRST_SCREEN;
-      PRINT(F("Screen: "));
-      PRINTLN(screenNum);
-      redrawScreen();
+      moveMenuForward();
     }
   }
-  if (settingsButton.isHeld() && screenNum != NO_SCREEN) {
-    screenNum = NO_SCREEN;
-    PRINT(F("Screen: "));
-    PRINTLN(screenNum);
-    redrawScreen();
+
+  if (settingsButton.isHeld() && currentScreen != SCREEN_BLANK) {
+    moveMenuTop();
     settingsLongPress = true;
+  }
+
+  if (currentScreen != prevScreen) {
+    PRINT(F("Screen: "));
+    PRINTLN(currentScreen);
+    redrawScreen();
   }
 
   if (settingsPlusButton.resetClicked()) {
@@ -267,8 +421,8 @@ void ControlPannel::handle() {
   }
 
   if (settingsValueChange != 0) {
-    switch (screenNum) {
-      case NO_SCREEN:
+    switch (currentScreen) {
+      case SCREEN_BLANK:
         radioControl->sendCommand(
           (settingsValueChange > 0) ?
           COMMAND_USER_COMMAND1 : COMMAND_USER_COMMAND2
@@ -302,7 +456,7 @@ void ControlPannel::handle() {
       case SCREEN_DUAL_RATE_A_Y:
       case SCREEN_DUAL_RATE_B_X:
       case SCREEN_DUAL_RATE_B_Y:
-        axis = screenNum - SCREEN_DUAL_RATE_A_X;
+        axis = currentScreen - SCREEN_DUAL_RATE_A_X;
         addWithConstrain(
           settings->values.axes[axis].dualRate,
           settingsValueChange * 10,
@@ -314,7 +468,7 @@ void ControlPannel::handle() {
       case SCREEN_TRIMMING_A_Y:
       case SCREEN_TRIMMING_B_X:
       case SCREEN_TRIMMING_B_Y:
-        axis = screenNum - SCREEN_TRIMMING_A_X;
+        axis = currentScreen - SCREEN_TRIMMING_A_X;
         addWithConstrain(
           settings->values.axes[axis].trimming,
           settingsValueChange * 5,
@@ -326,24 +480,12 @@ void ControlPannel::handle() {
       case SCREEN_INVERT_A_Y:
       case SCREEN_INVERT_B_X:
       case SCREEN_INVERT_B_Y:
-        axis = screenNum - SCREEN_INVERT_A_X;
+        axis = currentScreen - SCREEN_INVERT_A_X;
         settings->values.axes[axis].joyInvert = settingsValueChange > 0;
-        break;
-      case SCREEN_CHANNEL_A_X:
-      case SCREEN_CHANNEL_A_Y:
-      case SCREEN_CHANNEL_B_X:
-      case SCREEN_CHANNEL_B_Y:
-        axis = screenNum - SCREEN_CHANNEL_A_X;
-        addWithConstrain(
-          settings->values.axes[axis].channel,
-          settingsValueChange,
-          NO_CHANNEL,
-          NUM_CHANNELS - 1
-        );
         break;
       case SCREEN_LOW_SWITCH_1:
       case SCREEN_LOW_SWITCH_2:
-        sw = screenNum - SCREEN_LOW_SWITCH_1;
+        sw = currentScreen - SCREEN_LOW_SWITCH_1;
         addWithConstrain(
           settings->values.switches[sw].low,
           settingsValueChange * 50,
@@ -353,7 +495,7 @@ void ControlPannel::handle() {
         break;
       case SCREEN_HIGH_SWITCH_1:
       case SCREEN_HIGH_SWITCH_2:
-        sw = screenNum - SCREEN_HIGH_SWITCH_1;
+        sw = currentScreen - SCREEN_HIGH_SWITCH_1;
         addWithConstrain(
           settings->values.switches[sw].high,
           settingsValueChange * 50,
@@ -361,9 +503,21 @@ void ControlPannel::handle() {
           SWITCH_MAX
         );
         break;
+      case SCREEN_CHANNEL_A_X:
+      case SCREEN_CHANNEL_A_Y:
+      case SCREEN_CHANNEL_B_X:
+      case SCREEN_CHANNEL_B_Y:
+        axis = currentScreen - SCREEN_CHANNEL_A_X;
+        addWithConstrain(
+          settings->values.axes[axis].channel,
+          settingsValueChange,
+          NO_CHANNEL,
+          NUM_CHANNELS - 1
+        );
+        break;
       case SCREEN_CHANNEL_SWITCH_1:
       case SCREEN_CHANNEL_SWITCH_2:
-        sw = screenNum - SCREEN_CHANNEL_SWITCH_1;
+        sw = currentScreen - SCREEN_CHANNEL_SWITCH_1;
         addWithConstrain(
           settings->values.switches[sw].channel,
           settingsValueChange,
@@ -386,12 +540,22 @@ void ControlPannel::handle() {
         }
         break;
       case SCREEN_SAVE:
-        screenNum = NO_SCREEN;
+        moveMenuTop();
         if (settingsValueChange > 0) {
           settings->saveProfile();
           buzzer->beep(BEEP_LOW_HZ, 500, 0, 1);
         }
         break;
+#ifndef FLAT_MENU
+      case SCREEN_GROUP_CONTROLS:
+      case SCREEN_GROUP_MAPPING:
+      case SCREEN_GROUP_PEER:
+        if (settingsValueChange > 0) moveMenuDown();
+        break;
+      case SCREEN_MENU_UP:
+        moveMenuUp();
+        break;
+#endif
     }
     redrawScreen();
   }

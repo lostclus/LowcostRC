@@ -18,11 +18,13 @@
 #define DISPLAY_ADDRESS 0x3C
 
 #if !defined(WITH_ADAFRUIT_SSD1306) && !defined(WITH_SSD1306_ASCII)
-#define WITH_ADAFRUIT_SSD1306
+#define WITH_SSD1306_ASCII
 #endif
 
 #define SETTINGS_PIN 6
 #define SETTINGS_PLUS_PIN 7
 #define SETTINGS_MINUS_PIN 8
+
+//undef FLAT_MENU
 
 #endif // Config_h
