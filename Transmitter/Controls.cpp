@@ -100,6 +100,8 @@ void Controls::handle() {
   static int prevChannels[NUM_CHANNELS];
   unsigned long now = millis();
 
+  if (!radioControl->radio->isPaired()) return;
+
   rp.control.packetType = PACKET_TYPE_CONTROL;
 
   for (int channel = 0; channel < NUM_CHANNELS; channel++)

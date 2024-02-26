@@ -28,6 +28,10 @@ enum ScreenEnum {
   SCREEN_BLANK,
   SCREEN_BATTARY,
   SCREEN_PROFILE,
+
+  // Radio
+  SCREEN_BIND_PEER,
+  SCREEN_PEER_ADDR,
   SCREEN_RF_CHANNEL,
 
   // Controls
@@ -67,6 +71,7 @@ enum ScreenEnum {
   FIRST_SCREEN = SCREEN_BLANK,
   LAST_SCREEN = SCREEN_SAVE,
 #else
+  SCREEN_GROUP_RADIO,
   SCREEN_GROUP_CONTROLS,
   SCREEN_GROUP_MAPPING,
   SCREEN_GROUP_PEER,
@@ -82,7 +87,8 @@ class ControlPannel {
     Buzzer *buzzer;
     RadioControl *radioControl;
     Controls *controls;
-    bool settingsLongPress = false;
+    bool settingsLongPress = false,
+         isPairing = false;
 #ifdef FLAT_MENU
     Screen currentScreen;
 #else
@@ -105,7 +111,6 @@ class ControlPannel {
     Button *buttonsArray[3];
     ButtonList buttons;
     unsigned long battaryUpdateTime = 0;
-    struct TelemetryPacket telemetry;
 
     void redrawScreen();
     void moveMenuTop();

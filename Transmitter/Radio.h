@@ -5,11 +5,19 @@
 
 class BaseRadioModule {
   public:
-    BaseRadioModule() {};
+    Address peer;
+    RFChannel rfChannel;
+
+    BaseRadioModule();
     virtual bool begin() = 0;
-    virtual bool setRFChannel(int rfChannel) = 0;
-    virtual bool receive(struct TelemetryPacket *telemetry) = 0;
-    virtual bool send(union RequestPacket *packet) = 0;
+    virtual bool setPeer(const Address *addr) = 0;
+    virtual bool setRFChannel(RFChannel ch) = 0;
+    virtual bool receive(union ResponsePacket *packet) = 0;
+    virtual bool send(const union RequestPacket *packet) = 0;
+    virtual bool pair() = 0;
+
+    bool isPaired();
+    void unpair();
 };
 
 #endif // Radio_h

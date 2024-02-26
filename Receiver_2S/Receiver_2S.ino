@@ -1,11 +1,12 @@
+#include <string.h>
 #include <EEPROM.h>
-#include <RF24.h>
 #include <Servo.h>
 
 #include <LowcostRC_Protocol.h>
 #include <LowcostRC_Console.h>
+#include <LowcostRC_Rx_nRF24.h>
 
-#define RESET_RF_CHANNEL_PIN 2
+#define PAIR_PIN 2
 
 #define CHANNEL1_PIN 3
 #define CHANNEL2_PIN 4
@@ -18,60 +19,63 @@
 #define VOLT_METER_R1 30000L
 #define VOLT_METER_R2 10000L
 
-#define RF_CHANNEL_ROM_ADDR 0
-#define NOLINK_ROM_ADDR 2
+#define RANDOM_SEED_PIN A1
 
-const ControlPacket DEFAULT_NOLINK_CONTROL = {
-  PACKET_TYPE_CONTROL,
-  {1500, 1500, 1500, 1500}
+#define SETTINGS_ADDR 0
+#define SETTINGS_MAGICK 0x1234
+
+struct Settings {
+  uint16_t magick;
+  Address address;
+  RFChannel rfChannel;
+  ControlPacket noLinkControl;
+} settings;
+
+const Settings defaultSettings PROGMEM = {
+  SETTINGS_MAGICK,
+  ADDRESS_NONE,
+  DEFAULT_RF_CHANNEL,
+  {
+    PACKET_TYPE_CONTROL,
+    {1500, 1500, 1500, 1500}
+  }
 };
 
 unsigned int battaryMV = 0;
 unsigned long controlTime,
               sendTelemetryTime;
+bool isNoLink = false;
 
 Servo channel1Servo, channel2Servo, channel3Servo;
-RF24 radio(RADIO_CE_PIN, RADIO_CSN_PIN);
-byte pipe[7];
+
+NRF24Receiver receiver(RADIO_CE_PIN, RADIO_CSN_PIN);
 
 void setup(void) {
-  int rfChannel = DEFAULT_RF_CHANNEL;
-
   #ifdef WITH_CONSOLE
   Serial.begin(115200);
   #endif
 
-  pinMode(RESET_RF_CHANNEL_PIN, INPUT_PULLUP);
-
+  pinMode(PAIR_PIN, INPUT_PULLUP);
   analogReference(DEFAULT);
+  randomSeed(analogRead(RANDOM_SEED_PIN));
 
   channel1Servo.attach(CHANNEL1_PIN);
   channel2Servo.attach(CHANNEL2_PIN);
   channel3Servo.attach(CHANNEL3_PIN);
 
-  if (radio.begin()) {
-    PRINTLN(F("Radio init: OK"));
-  } else {
-    PRINTLN(F("Radio init: FAILURE"));
+  PRINTLN(F("Reading settings from flash ROM..."));
+  EEPROM.get(SETTINGS_ADDR, settings);
+  if (settings.magick != SETTINGS_MAGICK) {
+    PRINTLN(F("No stored settings found, use defaults"));
+    memcpy_P(&settings, &defaultSettings, sizeof(Settings));
+    for (int i = 0; i < NRF24_ADDRESS_LENGTH; i++)
+      settings.address.address[i] = random(1 << 8);
+    EEPROM.put(SETTINGS_ADDR, settings);
+  }  else {
+    PRINTLN(F("Using stored settings in flash ROM"));
   }
-  radio.setRadiation(RF24_PA_MAX, RF24_250KBPS);
-  radio.setPayloadSize(PACKET_SIZE);
 
-  if (digitalRead(RESET_RF_CHANNEL_PIN) != LOW) {
-    EEPROM.get(RF_CHANNEL_ROM_ADDR, rfChannel);
-    if (rfChannel > 125 || rfChannel < 0) {
-      rfChannel = DEFAULT_RF_CHANNEL;
-    }
-  }
-  radio.setChannel(rfChannel);
-  PRINT(F("RF channel: "));
-  PRINTLN(rfChannel);
-
-  sprintf_P(pipe, PSTR(PIPE_FORMAT), rfChannel);
-  radio.openReadingPipe(1, pipe);
-
-  radio.enableAckPayload();
-  radio.startListening();
+  receiver.begin(&settings.address, settings.rfChannel);
 
   controlTime = 0;
   sendTelemetryTime = 0;
@@ -83,15 +87,10 @@ void loop(void) {
   static int lastChannels[NUM_CHANNELS];
   static bool hasLastChannels = false;
 
-  if (now - sendTelemetryTime > 5000) {
-    sendTelemetry();
-    sendTelemetryTime = now;
-  }
-
-  if (radio.available()) {
-    radio.read(&rp, sizeof(rp));
+  if (receiver.receive(&rp)) {
     if (rp.generic.packetType == PACKET_TYPE_CONTROL) {
       controlTime = now;
+      isNoLink = false;
 
       for (int channel = 0; channel < NUM_CHANNELS; channel++)
         lastChannels[channel] = rp.control.channels[channel];
@@ -112,32 +111,36 @@ void loop(void) {
 
       applyControl(&rp.control);
     } else if (rp.generic.packetType == PACKET_TYPE_SET_RF_CHANNEL) {
-      radio.setChannel(rp.rfChannel.rfChannel);
-      sprintf_P(pipe, PSTR(PIPE_FORMAT), rp.rfChannel.rfChannel);
-      radio.openReadingPipe(1, pipe);
       PRINT(F("New RF channel: "));
       PRINTLN(rp.rfChannel.rfChannel);
-      EEPROM.put(RF_CHANNEL_ROM_ADDR, rp.rfChannel.rfChannel);
+      receiver.setRFChannel(rp.rfChannel.rfChannel);
+      settings.rfChannel = rp.rfChannel.rfChannel;
+      EEPROM.put(SETTINGS_ADDR, settings);
     } else if (rp.generic.packetType == PACKET_TYPE_COMMAND) {
       if (rp.command.command == COMMAND_SAVE_FOR_NOLINK && hasLastChannels) {
-        PRINT(F("Saving state for no link"));
+        PRINTLN(F("Saving state for no link"));
         rp.control.packetType = PACKET_TYPE_CONTROL;
         for (int channel = 0; channel < NUM_CHANNELS; channel++)
           rp.control.channels[channel] = lastChannels[channel];
-        EEPROM.put(NOLINK_ROM_ADDR, rp.control);
+        memcpy(&settings.noLinkControl, &rp.control, sizeof(ControlPacket));
+        EEPROM.put(SETTINGS_ADDR, settings);
       }
     }
   }
 
-  if (controlTime > 0 && now - controlTime > 1250) {
-    PRINTLN(F("Radio signal lost"));
-    EEPROM.get(NOLINK_ROM_ADDR, rp.control);
+  if (now - sendTelemetryTime > 5000) {
+    sendTelemetry();
+    sendTelemetryTime = now;
+  }
 
-    if (rp.control.packetType == PACKET_TYPE_CONTROL) {
-      applyControl(&rp.control);
-    } else {
-      applyControl(&DEFAULT_NOLINK_CONTROL);
-    }
+  if (!isNoLink && controlTime > 0 && now - controlTime > 1250) {
+    PRINTLN(F("Radio signal lost"));
+    isNoLink = true;
+    applyControl(&settings.noLinkControl);
+  }
+
+  if (digitalRead(PAIR_PIN) == LOW) {
+    receiver.pair();
   }
 }
 
@@ -151,16 +154,16 @@ void applyControl(ControlPacket *control) {
 }
 
 void sendTelemetry() {
-  struct TelemetryPacket telemetry;
+  ResponsePacket resp;
 
-  telemetry.packetType = PACKET_TYPE_TELEMETRY;
+  resp.telemetry.packetType = PACKET_TYPE_TELEMETRY;
 
   updateBattaryVoltage();
   PRINT(F("battaryMV: "));
   PRINTLN(battaryMV);
-  telemetry.battaryMV = battaryMV;
+  resp.telemetry.battaryMV = battaryMV;
 
-  radio.writeAckPayload(1, &telemetry, sizeof(telemetry));
+  receiver.send(&resp);
 }
 
 unsigned long vHist[5] = {0, 0, 0, 0, 0};

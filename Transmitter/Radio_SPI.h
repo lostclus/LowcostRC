@@ -11,12 +11,16 @@ class SPIRadioModule : public BaseRadioModule {
     void writeStatus(uint32_t status);
     void readData(uint8_t *data);
     void writeData(uint8_t *data, size_t len);
+    bool receiveGeneric(void *data, size_t size, uint32_t status);
+    bool sendGeneric(const void *data, size_t size, uint32_t status);
   public:
     SPIRadioModule();
     virtual bool begin();
-    virtual bool setRFChannel(int rfChannel);
-    virtual bool receive(struct TelemetryPacket *telemetry);
-    virtual bool send(union RequestPacket *packet);
+    virtual bool setPeer(const Address *addr);
+    virtual bool setRFChannel(RFChannel ch);
+    virtual bool receive(union ResponsePacket *packet);
+    virtual bool send(const union RequestPacket *packet);
+    virtual bool pair();
 };
 
 #endif	//Radio_SPI_h

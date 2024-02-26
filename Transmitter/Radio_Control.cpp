@@ -2,23 +2,23 @@
 #include "Radio_Control.h"
 
 RadioControl::RadioControl(Buzzer *buzzer) : radio(NULL), buzzer(buzzer) {
+  telemetry.battaryMV = 0;
 }
 
 void RadioControl::begin() {
-  radio = &nrf24Radio;
-
-  if (nrf24Radio.begin()) {
-    radio = &nrf24Radio;
-  } else {
-    spiRadio.begin();
-    radio = &spiRadio;
-  }
+  radio = NULL;
+#ifdef WITH_RADIO_NRF24
+  if (!radio && nrf24Radio.begin()) radio = &nrf24Radio;
+#endif
+#ifdef WITH_RADIO_SPI
+  if (!radio && spiRadio.begin()) radio = &spiRadio;
+#endif
 }
 
-void RadioControl::sendRFChannel(int rfChannel) {
+void RadioControl::sendRFChannel(RFChannel channel) {
   union RequestPacket rp;
   rp.rfChannel.packetType = PACKET_TYPE_SET_RF_CHANNEL;
-  rp.rfChannel.rfChannel = rfChannel;
+  rp.rfChannel.rfChannel = channel;
   sendPacket(&rp);
 }
 
@@ -29,7 +29,7 @@ void RadioControl::sendCommand(Command command) {
   sendPacket(&rp);
 }
 
-void RadioControl::sendPacket(union RequestPacket *packet) {
+void RadioControl::sendPacket(const union RequestPacket *packet) {
   static bool prevStatusRadioSuccess = false,
               prevStatusRadioFailure = false;
   bool radioOK, isStatusChanged;
@@ -68,6 +68,7 @@ void RadioControl::sendPacket(union RequestPacket *packet) {
 }
 
 void RadioControl::handle() {
+  ResponsePacket response;
   unsigned long now = millis();
 
   if (errorTime > 0 && now - errorTime > 250) {
@@ -76,6 +77,15 @@ void RadioControl::handle() {
   }
   if (requestSendTime > 0 && now - requestSendTime > 250) {
     statusRadioSuccess = false;
+  }
+
+  if (radio->receive(&response)) {
+    if (response.telemetry.packetType == PACKET_TYPE_TELEMETRY) {
+      memcpy(&telemetry, &response.telemetry, sizeof(TelemetryPacket));
+      telemetryTime = now;
+      PRINT(F("Peer device battary (mV): "));
+      PRINTLN(telemetry.battaryMV);
+    }
   }
 }
 

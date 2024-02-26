@@ -4,28 +4,27 @@
 #include <LowcostRC_Protocol.h>
 #include "Types.h"
 
-#define SETTINGS_MAGICK 0x5558
-#define PROFILES_ADDR 0
 #define NUM_PROFILES 5
 
 struct AxisSettings {
-  int joyCenter,
-      joyThreshold;
+  uint16_t joyCenter,
+           joyThreshold;
   bool joyInvert;
-  int dualRate,
-      trimming;
+  uint16_t dualRate;
+  int16_t trimming;
   ChannelN channel;
 };
 
 struct SwitchesSettings {
-  int low, high;
+  uint16_t low, high;
   ChannelN channel;
 };
 
 struct SettingsValues {
-  int magick;
-  int rfChannel;
-  int battaryLowMV;
+  uint16_t magick;
+  Address peer;
+  RFChannel rfChannel;
+  uint16_t battaryLowMV;
   AxisSettings axes[AXES_COUNT];
   SwitchesSettings switches[SWITCHES_COUNT];
 };
@@ -33,8 +32,10 @@ struct SettingsValues {
 class Settings {
   public:
     SettingsValues values;
-    int currentProfile = 0;
+    uint8_t currentProfile = 0;
+    bool isLoaded = false;
 
+    bool begin();
     bool loadProfile();
     void saveProfile();
 };

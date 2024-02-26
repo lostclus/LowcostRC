@@ -19,3 +19,8 @@ upload:
 		-b "$(BOARD)" \
 		-p $(PORT) \
 		.
+
+install: compile upload
+
+monitor:
+	minicom -D $(PORT)

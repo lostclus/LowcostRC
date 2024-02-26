@@ -5,7 +5,12 @@
 
 #include "Radio_SPI.h"
 
-const int SS_PIN = 10;
+#define SS_PIN 10
+#define INIT_TIMEOUT 2000
+#define INIT_RETRY_COUNT 5
+#define INIT_RETRY_PAUSE 500
+#define SEND_TIMEOUT 500
+#define PAIR_TIMEOUT 5000
 
 
 SPIRadioModule::SPIRadioModule() {
@@ -54,64 +59,126 @@ void SPIRadioModule::writeData(uint8_t *data, size_t len) {
 }
 
 bool SPIRadioModule::begin() {
+  uint32_t newStatus;
+
   pinMode(SS_PIN, OUTPUT);
   SPI.begin();
 
-  writeStatus(STATUS_STARTING);
-  if (readStatus() != STATUS_STARTING) {
+  for (int i = 0; i < INIT_RETRY_COUNT; i++) {
+    writeStatus(SPI_STATUS_STARTING);
+    for (
+        unsigned long start = millis();
+        millis() - start < INIT_TIMEOUT;
+        delay(1)
+    ) {
+      newStatus = readStatus();
+      if (newStatus != SPI_STATUS_STARTING) break;
+    }
+    if (newStatus == SPI_STATUS_OK) break;
+    delay(INIT_RETRY_PAUSE);
+  }
+
+  if (newStatus != SPI_STATUS_OK) {
     PRINTLN(F("SPI: Init: FAIL"));
+    PRINTLN(newStatus);
     return false;
   }
   PRINTLN(F("SPI: Init: OK"));
   return true;
 }
 
-bool SPIRadioModule::setRFChannel(int rfChannel) {
-  writeStatus(STATUS_SET_RF_CHANNEL + rfChannel);
-  PRINT(F("SPI: RF channel: "));
-  PRINTLN(rfChannel);
-  return true;
-}
+bool SPIRadioModule::setPeer(const Address *addr) {
+  SPIRequestPacket req;
 
-bool SPIRadioModule::receive(struct TelemetryPacket *telemetry) {
-  uint8_t buf[SPI_PACKET_SIZE];
-  unsigned long now = millis();
-  static unsigned long telemetryTime = 0;
+  req.peerAddr.packetType = SPI_PACKET_TYPE_SET_PEER_ADDRESS;
+  memcpy(req.peerAddr.peer.address, addr->address, ADDRESS_LENGTH);
 
-  if (now - telemetryTime < 5000) return false;
-
-  memset(buf, 0, sizeof(buf));
-  readData(buf);
-
-  if (((TelemetryPacket*)buf)->packetType == PACKET_TYPE_TELEMETRY) {
-    memcpy(telemetry, buf, sizeof(TelemetryPacket));
-    telemetryTime = now;
+  if (sendGeneric(&req, sizeof(SPIRequestPacket), SPI_STATUS_SET_PEER_ADDRESS)) {
+    memcpy(peer.address, addr->address, ADDRESS_LENGTH);
     return true;
   }
-
   return false;
 }
 
-bool SPIRadioModule::send(union RequestPacket *packet) {
+bool SPIRadioModule::setRFChannel(RFChannel ch) {
+  SPIRequestPacket req;
+
+  req.rfChannel.packetType = SPI_PACKET_TYPE_SET_RF_CHANNEL;
+  req.rfChannel.rfChannel = ch;
+
+  if (sendGeneric(&req, sizeof(SPIRequestPacket), SPI_STATUS_SET_CHANNEL)) {
+    rfChannel = ch;
+    return true;
+  }
+  return false;
+}
+
+bool SPIRadioModule::receiveGeneric(void *data, size_t size, uint32_t status) {
+  uint8_t buf[SPI_PACKET_SIZE];
+
+  if (readStatus() == status) {
+    memset(buf, 0, sizeof(buf));
+    readData(buf);
+    memcpy(data, buf, size);
+    writeStatus(SPI_STATUS_OK);
+    return true;
+  }
+  return false;
+}
+
+bool SPIRadioModule::receive(union ResponsePacket *packet) {
+  return receiveGeneric(packet, sizeof(ResponsePacket), SPI_STATUS_RECEIVING);
+}
+
+bool SPIRadioModule::sendGeneric(const void *data, size_t size, uint32_t status) {
   uint32_t newStatus;
 
-  writeStatus(STATUS_TRANSMITING);
-
-  for (int i = 0; i < 5; i++) {
-    unsigned long txTime = millis();
-    writeData((uint8_t*)packet, sizeof(RequestPacket));
-    while ((newStatus = readStatus()) == STATUS_TRANSMITING && millis() - txTime < 20) {
-      delay(1);
-    }
-    if (newStatus == STATUS_OK) break;
+  writeStatus(status);
+  writeData((uint8_t*)data, size);
+  for (
+    unsigned long start = millis();
+    millis() - start < SEND_TIMEOUT;
+    delay(1)
+  ) {
+    newStatus = readStatus();
+    if (newStatus != status) break;
   }
 
-  switch (newStatus) {
-    case STATUS_TRANSMITING:
-    case STATUS_FAILURE:
-      return false;
-  }
+  if (newStatus == status || newStatus == SPI_STATUS_FAILURE)
+    return false;
   return true;
+}
+
+bool SPIRadioModule::send(const union RequestPacket *packet) {
+  return sendGeneric(packet, sizeof(RequestPacket), SPI_STATUS_TRANSMITING);
+}
+
+bool SPIRadioModule::pair() {
+  ResponsePacket resp;
+
+  PRINT(F("SPI: Starting pairing"));
+  writeStatus(SPI_STATUS_PAIRING);
+
+  for (
+      unsigned long start = millis();
+      millis() - start < PAIR_TIMEOUT;
+      delay(1)
+  ) {
+    if (!receiveGeneric(&resp, sizeof(ResponsePacket), SPI_STATUS_PAIRED))
+      continue;
+    if (resp.pair.packetType != PACKET_TYPE_PAIR)
+      continue;
+    if (resp.pair.status != PAIR_STATUS_READY)
+      continue;
+    PRINTLN(F("SPI: Paired"));
+    memcpy(peer.address, resp.pair.sender.address, ADDRESS_LENGTH);
+    writeStatus(SPI_STATUS_OK);
+    return true;
+  }
+
+  PRINTLN(F("SPI: Not paired"));
+  writeStatus(SPI_STATUS_OK);
+  return false;
 }
 
 // vim:et:sw=2:ai

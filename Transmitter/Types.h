@@ -9,7 +9,6 @@ enum Axis {
   AXES_COUNT,
 };
 
-
 enum Switch {
   SWITCH_1,
   SWITCH_2,

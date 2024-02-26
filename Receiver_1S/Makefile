@@ -21,3 +21,6 @@ upload:
 		.
 
 install: compile upload
+
+monitor:
+	minicom -D $(PORT)

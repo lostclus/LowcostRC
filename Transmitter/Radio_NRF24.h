@@ -7,12 +7,15 @@
 class NRF24RadioModule : public BaseRadioModule {
   private:
     RF24 rf24;
+    uint8_t rfChannelToNRF24(RFChannel ch);
   public:
     NRF24RadioModule();
     virtual bool begin();
-    virtual bool setRFChannel(int rfChannel);
-    virtual bool receive(struct TelemetryPacket *telemetry);
-    virtual bool send(union RequestPacket *packet);
+    virtual bool setPeer(const Address *addr);
+    virtual bool setRFChannel(RFChannel ch);
+    virtual bool receive(union ResponsePacket *telemetry);
+    virtual bool send(const union RequestPacket *packet);
+    virtual bool pair();
 };
 
 #endif	//Radio_NRF24_h

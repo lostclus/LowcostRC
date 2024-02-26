@@ -1,5 +1,6 @@
 #include <LowcostRC_Console.h>
 #include "Battary.h"
+#include "Settings.h"
 #include "Control_Pannel.h"
 
 const int DUAL_RATE_MIN = 10,
@@ -10,6 +11,14 @@ const int DUAL_RATE_MIN = 10,
           SWITCH_MAX = 3000;
 
 #ifndef FLAT_MENU
+const Screen radioMenu[] = {
+  SCREEN_BIND_PEER,
+  SCREEN_PEER_ADDR,
+  SCREEN_RF_CHANNEL,
+  SCREEN_MENU_UP,
+  SCREEN_NULL
+};
+
 const Screen controlsMenu[] = {
   SCREEN_AUTO_CENTER,
   SCREEN_DUAL_RATE_A_X,
@@ -54,7 +63,7 @@ const Screen mainMenu[] = {
   SCREEN_BLANK,
   SCREEN_BATTARY,
   SCREEN_PROFILE,
-  SCREEN_RF_CHANNEL,
+  SCREEN_GROUP_RADIO,
   SCREEN_GROUP_CONTROLS,
   SCREEN_GROUP_MAPPING,
   SCREEN_GROUP_PEER,
@@ -66,13 +75,14 @@ struct SubMenu {
   Screen screen,
          *subMenu;
 } subMenu[] = {
+  {SCREEN_GROUP_RADIO, radioMenu},
   {SCREEN_GROUP_CONTROLS, controlsMenu},
   {SCREEN_GROUP_MAPPING, mappingMenu},
   {SCREEN_GROUP_PEER, peerMenu},
 };
 #endif
 
-#define addWithConstrain(value, delta, lo, hi) value = constrain(value + (delta), lo, hi)
+#define addWithConstrain(value, delta, lo, hi) value = constrain((long)value + (delta), lo, hi)
 
 ControlPannel::ControlPannel(
   Settings *settings, Buzzer *buzzer, RadioControl *radioControl, Controls *controls
@@ -116,6 +126,9 @@ void ControlPannel::begin() {
   display.setFont(System5x7);
   display.clear();
 #endif
+
+  radioControl->radio->setPeer(&settings->values.peer);
+  radioControl->radio->setRFChannel(settings->values.rfChannel);
 }
 
 void ControlPannel::redrawScreen() {
@@ -136,8 +149,8 @@ void ControlPannel::redrawScreen() {
         PSTR("Battary\nT: %d.%03dV\nR: %d.%03dV"),
         thisBattaryMV / 1000,
         thisBattaryMV % 1000,
-        telemetry.battaryMV / 1000,
-        telemetry.battaryMV % 1000
+        radioControl->telemetry.battaryMV / 1000,
+        radioControl->telemetry.battaryMV % 1000
       );
       break;
     case SCREEN_PROFILE:
@@ -145,6 +158,32 @@ void ControlPannel::redrawScreen() {
         text,
         PSTR("Profile\n%d"),
         settings->currentProfile
+      );
+      break;
+    case SCREEN_BIND_PEER:
+      if (isPairing) {
+        sprintf_P(
+          text,
+          PSTR("Pairing...")
+        );
+      } else {
+        sprintf_P(
+          text,
+          PSTR("Paired\n%s"),
+          radioControl->radio->isPaired() ? yStr : nStr
+        );
+      }
+      break;
+    case SCREEN_PEER_ADDR:
+      sprintf_P(
+        text,
+        PSTR("Peer\n%02x:%02x:%02x\n%02x:%02x:%02x"),
+        settings->values.peer.address[0],
+        settings->values.peer.address[1],
+        settings->values.peer.address[2],
+        settings->values.peer.address[3],
+        settings->values.peer.address[4],
+        settings->values.peer.address[5]
       );
       break;
     case SCREEN_RF_CHANNEL:
@@ -279,6 +318,12 @@ void ControlPannel::redrawScreen() {
       );
       break;
 #ifndef FLAT_MENU
+    case SCREEN_GROUP_RADIO:
+      sprintf_P(
+        text,
+        PSTR("Radio>")
+      );
+      break;
     case SCREEN_GROUP_CONTROLS:
       sprintf_P(
         text,
@@ -434,7 +479,37 @@ void ControlPannel::handle() {
           settings->currentProfile, settingsValueChange, 0, NUM_PROFILES - 1
         );
         settings->loadProfile();
+        radioControl->radio->setPeer(&settings->values.peer);
         radioControl->radio->setRFChannel(settings->values.rfChannel);
+        break;
+      case SCREEN_BIND_PEER:
+        if (settingsValueChange > 0) {
+          isPairing = true;
+          redrawScreen();
+          if (radioControl->radio->pair()) {
+            memcpy(
+              settings->values.peer.address,
+              radioControl->radio->peer.address,
+              ADDRESS_LENGTH
+            );
+            buzzer->beep(BEEP_LOW_HZ, 30, 30, 1);
+          } else {
+            buzzer->beep(BEEP_HIGH_HZ, 3, 30, 5);
+          }
+          isPairing = false;
+          redrawScreen();
+        } else {
+          radioControl->radio->unpair();
+          memcpy(
+            settings->values.peer.address,
+            radioControl->radio->peer.address,
+            ADDRESS_LENGTH
+          );
+          settings->values.rfChannel = DEFAULT_RF_CHANNEL;
+        }
+        break;
+      case SCREEN_PEER_ADDR:
+          // TODO: edit peer address
         break;
       case SCREEN_RF_CHANNEL:
         addWithConstrain(
@@ -547,6 +622,7 @@ void ControlPannel::handle() {
         }
         break;
 #ifndef FLAT_MENU
+      case SCREEN_GROUP_RADIO:
       case SCREEN_GROUP_CONTROLS:
       case SCREEN_GROUP_MAPPING:
       case SCREEN_GROUP_PEER:
@@ -565,14 +641,13 @@ void ControlPannel::handle() {
     thisBattaryMV = getBattaryVoltage();
     PRINT(F("This device battary (mV): "));
     PRINTLN(thisBattaryMV);
-    redrawScreen();
-  }
+    if (currentScreen == SCREEN_BATTARY) {
+      redrawScreen();
+    }
 
-  if (radioControl->radio->receive(&telemetry)) {
-    PRINT(F("Peer device battary (mV): "));
-    PRINTLN(telemetry.battaryMV);
     if (
-      telemetry.battaryMV > 0 && telemetry.battaryMV < settings->values.battaryLowMV
+      radioControl->telemetry.battaryMV > 0
+      && radioControl->telemetry.battaryMV < settings->values.battaryLowMV
     ) {
       buzzer->beep(BEEP_LOW_HZ, 200, 100, 3);
     }

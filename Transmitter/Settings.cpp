@@ -4,6 +4,8 @@
 #include <LowcostRC_Console.h>
 #include "Settings.h"
 
+#define SETTINGS_MAGICK 0x5558
+#define PROFILES_ADDR 0
 #define SETTINGS_SIZE sizeof(SettingsValues)
 
 const int DEFAULT_BATTARY_LOW_MV = 3400,
@@ -17,6 +19,7 @@ const int DEFAULT_DUAL_RATE = 900,
 
 const SettingsValues defaultSettingsValues PROGMEM = {
   SETTINGS_MAGICK,
+  ADDRESS_NONE,
   DEFAULT_RF_CHANNEL,
   DEFAULT_BATTARY_LOW_MV,
   // axes
@@ -69,6 +72,11 @@ const SettingsValues defaultSettingsValues PROGMEM = {
   }
 };
 
+bool Settings::begin() {
+  loadProfile();
+  return true;
+}
+
 bool Settings::loadProfile() {
   PRINT(F("Reading profile #"));
   PRINT(currentProfile);
@@ -78,13 +86,17 @@ bool Settings::loadProfile() {
   if (values.magick != SETTINGS_MAGICK) {
     PRINTLN(F("No stored settings found, use defaults"));
     memcpy_P(&values, &defaultSettingsValues, SETTINGS_SIZE);
+    isLoaded = false;
     return false;
   } 
 
   PRINTLN(F("Using stored settings in flash ROM"));
+  isLoaded = true;
   return true;
 }
 
 void Settings::saveProfile() {
   EEPROM.put(PROFILES_ADDR + currentProfile * SETTINGS_SIZE, values);
 }
+
+// vim:ai:sw=2:et
