@@ -46,8 +46,9 @@ unsigned long controlTime,
               sendTelemetryTime;
 bool isNoLink = false;
 
-Servo channel1Servo, channel2Servo, channel3Servo;
-
+Servo channel1Servo,
+      channel2Servo,
+      channel3Servo;
 NRF24Receiver receiver(RADIO_CE_PIN, RADIO_CSN_PIN);
 
 void setup(void) {

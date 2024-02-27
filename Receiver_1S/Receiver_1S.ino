@@ -8,9 +8,9 @@
 
 #define PAIR_PIN 2
 
-#define CHANNEL1_PIN 4
-#define CHANNEL2_PIN 5
-#define CHANNEL3_PIN 3
+#define CHANNEL1_PIN 3
+#define CHANNEL2_PIN 4
+#define CHANNEL3_PIN 5
 
 #define RADIO_CE_PIN 9
 #define RADIO_CSN_PIN 10
@@ -49,7 +49,8 @@ unsigned long controlTime,
               sendTelemetryTime;
 bool isNoLink = false;
 
-Servo channel1Servo, channel2Servo;
+Servo channel1Servo,
+      channel2Servo;
 NRF24Receiver receiver(RADIO_CE_PIN, RADIO_CSN_PIN);
 
 void setup(void) {
@@ -61,11 +62,11 @@ void setup(void) {
   analogReference(DEFAULT);
   randomSeed(analogRead(RANDOM_SEED_PIN));
 
-  pinMode(CHANNEL3_PIN, OUTPUT);
-  digitalWrite(CHANNEL3_PIN, LOW);
-
   channel1Servo.attach(CHANNEL1_PIN);
   channel2Servo.attach(CHANNEL2_PIN);
+
+  pinMode(CHANNEL3_PIN, OUTPUT);
+  digitalWrite(CHANNEL3_PIN, LOW);
 
   PRINTLN(F("Reading settings from flash ROM..."));
   EEPROM.get(SETTINGS_ADDR, settings);

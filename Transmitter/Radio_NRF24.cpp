@@ -30,13 +30,19 @@ uint8_t NRF24RadioModule::rfChannelToNRF24(RFChannel ch) {
 
 bool NRF24RadioModule::setPeer(const Address *addr) {
   memcpy(&peer, addr, sizeof(peer));
+  rf24.stopListening();
   rf24.openWritingPipe(peer.address);
+  rf24.enableAckPayload();
   return true;
 }
 
 bool NRF24RadioModule::setRFChannel(RFChannel ch) {
   rfChannel = ch;
   rf24.setChannel(rfChannelToNRF24(rfChannel));
+  PRINT(F("NRF24: RF channel: "));
+  PRINTLN(rfChannel);
+  PRINT(F("NRF24: NRF24 channel: "));
+  PRINTLN(rfChannelToNRF24(rfChannel));
   return true;
 }
 
@@ -56,8 +62,10 @@ bool NRF24RadioModule::pair() {
   Address broadcast = ADDRESS_BROADCAST;
   RequestPacket req, resp;
 
-  rf24.setChannel(NRF24_DEFAULT_CHANNEL);
+  rf24.stopListening();
   rf24.openWritingPipe(broadcast.address);
+  rf24.enableAckPayload();
+  rf24.setChannel(NRF24_DEFAULT_CHANNEL);
 
   req.pair.packetType = PACKET_TYPE_PAIR;
   req.pair.session = random(1 << 15);

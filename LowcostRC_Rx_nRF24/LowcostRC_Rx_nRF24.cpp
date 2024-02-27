@@ -11,12 +11,36 @@ uint8_t NRF24Receiver::rfChannelToNRF24(RFChannel ch) {
 }
 
 void NRF24Receiver::configure(const Address *addr, RFChannel ch) {
+#ifdef WITH_CONSOLE
+  char text[18];
+#endif
+
+  rf24.closeReadingPipe(1);
   rf24.setRadiation(RF24_PA_MAX, RF24_250KBPS);
   rf24.setPayloadSize(PACKET_SIZE);
   rf24.enableAckPayload();
   rf24.openReadingPipe(1, addr->address);
   rf24.setChannel(rfChannelToNRF24(ch));
   rf24.startListening();
+
+#ifdef WITH_CONSOLE
+  sprintf_P(
+    text,
+    PSTR("%02x:%02x:%02x:%02x:%02x:%02x"),
+    addr->address[0],
+    addr->address[1],
+    addr->address[2],
+    addr->address[3],
+    addr->address[4],
+    addr->address[5]
+  );
+#endif
+  PRINT(F("Addr: "));
+  PRINTLN(text);
+  PRINT(F("RF channel: "));
+  PRINTLN(ch);
+  PRINT(F("NRF24 channel: "));
+  PRINTLN(rfChannelToNRF24(ch));
 }
 
 bool NRF24Receiver::begin(const Address *addr, RFChannel ch) {
@@ -33,6 +57,10 @@ bool NRF24Receiver::begin(const Address *addr, RFChannel ch) {
 
 void NRF24Receiver::setRFChannel(RFChannel ch) {
   rf24.setChannel(rfChannelToNRF24(ch));
+  PRINT(F("RF channel: "));
+  PRINTLN(ch);
+  PRINT(F("NRF24 channel: "));
+  PRINTLN(rfChannelToNRF24(ch));
 }
 
 bool NRF24Receiver::receive(RequestPacket *packet) {
