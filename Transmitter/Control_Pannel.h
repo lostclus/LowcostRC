@@ -28,6 +28,7 @@ enum ScreenEnum {
   SCREEN_BLANK,
   SCREEN_BATTARY,
   SCREEN_PROFILE,
+  SCREEN_PROFILE_NAME,
 
   // Radio
   SCREEN_BIND_PEER,
@@ -87,8 +88,6 @@ class ControlPannel {
     Buzzer *buzzer;
     RadioControl *radioControl;
     Controls *controls;
-    bool settingsLongPress = false,
-         isPairing = false;
 #ifdef FLAT_MENU
     Screen currentScreen;
 #else
@@ -97,7 +96,6 @@ class ControlPannel {
            *currentMenuItem;
 #define currentScreen (*currentMenuItem)
 #endif
-    unsigned int thisBattaryMV = 0;
 
 #if defined(WITH_ADAFRUIT_SSD1306)
     Adafruit_SSD1306 display;
@@ -108,9 +106,11 @@ class ControlPannel {
     Button settingsButton,
            settingsPlusButton,
            settingsMinusButton;
-    Button *buttonsArray[3];
-    ButtonList buttons;
-    unsigned long battaryUpdateTime = 0;
+    unsigned long battaryUpdateTime = 0,
+                  settingsChangeTime = 0;
+    unsigned int thisBattaryMV = 0;
+    uint8_t flags = 0,
+            cursor = 0;
 
     void redrawScreen();
     void moveMenuTop();

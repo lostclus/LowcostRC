@@ -22,6 +22,7 @@ struct SwitchesSettings {
 
 struct SettingsValues {
   uint16_t magick;
+  char profileName[8];
   Address peer;
   RFChannel rfChannel;
   uint16_t battaryLowMV;

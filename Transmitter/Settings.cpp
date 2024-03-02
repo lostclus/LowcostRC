@@ -4,21 +4,22 @@
 #include <LowcostRC_Console.h>
 #include "Settings.h"
 
-#define SETTINGS_MAGICK 0x5558
+#define SETTINGS_MAGICK 0x5559
 #define PROFILES_ADDR 0
 #define SETTINGS_SIZE sizeof(SettingsValues)
 
-const int DEFAULT_BATTARY_LOW_MV = 3400,
-          DEFAULT_JOY_CENTER = 512,
-          DEFAULT_JOY_THRESHOLD = 1;
-const bool DEFAULT_JOY_INVERT = false;
-const int DEFAULT_DUAL_RATE = 900,
-          DEFAULT_TRIMMING = 0,
-          DEFAULT_SWITCH_LOW = 1000,
-          DEFAULT_SWITCH_HIGH = 2000;
+#define DEFAULT_BATTARY_LOW_MV  3400
+#define DEFAULT_JOY_CENTER      512
+#define DEFAULT_JOY_THRESHOLD   1
+#define DEFAULT_JOY_INVERT      false
+#define DEFAULT_DUAL_RATE       900
+#define DEFAULT_TRIMMING        0
+#define DEFAULT_SWITCH_LOW      1000
+#define DEFAULT_SWITCH_HIGH     2000
 
 const SettingsValues defaultSettingsValues PROGMEM = {
   SETTINGS_MAGICK,
+  {0, 0, 0, 0, 0, 0, 0, 0},
   ADDRESS_NONE,
   DEFAULT_RF_CHANNEL,
   DEFAULT_BATTARY_LOW_MV,
@@ -79,7 +80,7 @@ bool Settings::begin() {
 
 bool Settings::loadProfile() {
   PRINT(F("Reading profile #"));
-  PRINT(currentProfile);
+  PRINT(currentProfile + 1);
   PRINTLN(F(" from flash ROM..."));
   EEPROM.get(PROFILES_ADDR + currentProfile * SETTINGS_SIZE, values);
 

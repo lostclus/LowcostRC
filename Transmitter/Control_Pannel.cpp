@@ -3,12 +3,17 @@
 #include "Settings.h"
 #include "Control_Pannel.h"
 
-const int DUAL_RATE_MIN = 10,
-          DUAL_RATE_MAX = 1500,
-          TRIMMING_MIN = -1500,
-          TRIMMING_MAX = 1500,
-          SWITCH_MIN = 0,
-          SWITCH_MAX = 3000;
+#define DUAL_RATE_MIN    10
+#define DUAL_RATE_MAX  1500
+#define TRIMMING_MIN   1500
+#define TRIMMING_MAX   1500
+#define SWITCH_MIN        0
+#define SWITCH_MAX     3000
+
+#define FLAG_SETTINGS_LONG_PRESS 0
+#define FLAG_IS_PAIRING          1
+#define FLAG_CURSOR_MOVE         2
+#define FLAG_CURSOR_BLINK        3
 
 #ifndef FLAT_MENU
 const Screen radioMenu[] = {
@@ -63,6 +68,7 @@ const Screen mainMenu[] = {
   SCREEN_BLANK,
   SCREEN_BATTARY,
   SCREEN_PROFILE,
+  SCREEN_PROFILE_NAME,
   SCREEN_GROUP_RADIO,
   SCREEN_GROUP_CONTROLS,
   SCREEN_GROUP_MAPPING,
@@ -99,16 +105,16 @@ ControlPannel::ControlPannel(
   , settingsButton(SETTINGS_PIN)
   , settingsPlusButton(SETTINGS_PLUS_PIN)
   , settingsMinusButton(SETTINGS_MINUS_PIN)
-  , buttonsArray({&settingsButton, &settingsPlusButton, &settingsMinusButton})
-  , buttons(buttonsArray)
 {
   moveMenuTop();
 }
 
 void ControlPannel::begin() {
-  buttons.begin();
+  settingsButton.begin();
   settingsButton.setDebounceTime(20);
+  settingsPlusButton.begin();
   settingsPlusButton.setDebounceTime(20);
+  settingsMinusButton.begin();
   settingsMinusButton.setDebounceTime(20);
 
 #if defined(WITH_ADAFRUIT_SSD1306)
@@ -156,12 +162,22 @@ void ControlPannel::redrawScreen() {
     case SCREEN_PROFILE:
       sprintf_P(
         text,
-        PSTR("Profile\n%d"),
-        settings->currentProfile
+        PSTR("Profile\n%d\n%s"),
+        settings->currentProfile + 1,
+        settings->values.profileName
       );
       break;
+    case SCREEN_PROFILE_NAME:
+      sprintf_P(
+        text,
+        PSTR("Name\n%s"),
+        settings->values.profileName
+      );
+      if (bitRead(flags, FLAG_CURSOR_BLINK))
+        text[cursor + 5] = '_';
+      break;
     case SCREEN_BIND_PEER:
-      if (isPairing) {
+      if (bitRead(flags, FLAG_IS_PAIRING)) {
         sprintf_P(
           text,
           PSTR("Pairing...")
@@ -185,6 +201,9 @@ void ControlPannel::redrawScreen() {
         settings->values.peer.address[4],
         settings->values.peer.address[5]
       );
+      if (bitRead(flags, FLAG_CURSOR_BLINK)) {
+        text[cursor * 3 + 5] = text[cursor * 3 + 6] = '_';
+      }
       break;
     case SCREEN_RF_CHANNEL:
       sprintf_P(
@@ -431,17 +450,20 @@ void ControlPannel::moveMenuUp() {
 #endif
 
 void ControlPannel::handle() {
-  int settingsValueChange = 0;
+  int change = 0;
   Axis axis;
   Switch sw;
   Screen prevScreen = currentScreen;
+  bool needsRedraw = false;
   unsigned long now = millis();
 
-  buttons.handle();
+  settingsButton.handle();
+  settingsPlusButton.handle();
+  settingsMinusButton.handle();
 
   if (settingsButton.resetClicked()) {
-    if (settingsLongPress) {
-      settingsLongPress = false;
+    if (bitRead(flags, FLAG_SETTINGS_LONG_PRESS)) {
+      bitClear(flags, FLAG_SETTINGS_LONG_PRESS);
     } else {
       moveMenuForward();
     }
@@ -449,7 +471,7 @@ void ControlPannel::handle() {
 
   if (settingsButton.isHeld() && currentScreen != SCREEN_BLANK) {
     moveMenuTop();
-    settingsLongPress = true;
+    bitSet(flags, FLAG_SETTINGS_LONG_PRESS);
   }
 
   if (currentScreen != prevScreen) {
@@ -458,33 +480,49 @@ void ControlPannel::handle() {
     redrawScreen();
   }
 
-  if (settingsPlusButton.resetClicked()) {
-    settingsValueChange = 1;
+  if (
+    settingsPlusButton.resetClicked()
+    || (settingsPlusButton.isHeld() && now - settingsChangeTime > 200)
+  ) {
+    change = 1;
+    settingsChangeTime = now;
   }
-  if (settingsMinusButton.resetClicked()) {
-    settingsValueChange = -1;
+  if (
+    settingsMinusButton.resetClicked()
+    || (settingsMinusButton.isHeld() && now - settingsChangeTime > 200)
+  ) {
+    change = -1;
+    settingsChangeTime = now;
   }
 
-  if (settingsValueChange != 0) {
+  if (change) {
     switch (currentScreen) {
       case SCREEN_BLANK:
         radioControl->sendCommand(
-          (settingsValueChange > 0) ?
+          (change > 0) ?
           COMMAND_USER_COMMAND1 : COMMAND_USER_COMMAND2
         );
         buzzer->beep(BEEP_LOW_HZ, 250, 0, 1);
         break;
       case SCREEN_PROFILE:
         addWithConstrain(
-          settings->currentProfile, settingsValueChange, 0, NUM_PROFILES - 1
+          settings->currentProfile, change, 0, NUM_PROFILES - 1
         );
         settings->loadProfile();
         radioControl->radio->setPeer(&settings->values.peer);
         radioControl->radio->setRFChannel(settings->values.rfChannel);
         break;
+      case SCREEN_PROFILE_NAME:
+        if (change) {
+          addWithConstrain(
+            settings->values.profileName[cursor], change, 0x20, 0x7f
+          );
+          bitSet(flags, FLAG_CURSOR_MOVE);
+        }
+        break;
       case SCREEN_BIND_PEER:
-        if (settingsValueChange > 0) {
-          isPairing = true;
+        if (change > 0) {
+          bitSet(flags, FLAG_IS_PAIRING);
           redrawScreen();
           if (radioControl->radio->pair()) {
             memcpy(
@@ -496,7 +534,7 @@ void ControlPannel::handle() {
           } else {
             buzzer->beep(BEEP_HIGH_HZ, 3, 30, 5);
           }
-          isPairing = false;
+          bitClear(flags, FLAG_IS_PAIRING);
           redrawScreen();
         } else {
           radioControl->radio->unpair();
@@ -509,17 +547,21 @@ void ControlPannel::handle() {
         }
         break;
       case SCREEN_PEER_ADDR:
-          // TODO: edit peer address
+        if (change) {
+          addWithConstrain(settings->values.peer.address[cursor], change, 0x00, 0xff);
+          radioControl->radio->setPeer(&settings->values.peer);
+          bitSet(flags, FLAG_CURSOR_MOVE);
+        }
         break;
       case SCREEN_RF_CHANNEL:
         addWithConstrain(
-          settings->values.rfChannel, settingsValueChange, 0, 125
+          settings->values.rfChannel, change, 0, 125
         );
         radioControl->sendRFChannel(settings->values.rfChannel);
         radioControl->radio->setRFChannel(settings->values.rfChannel);
         break;
       case SCREEN_AUTO_CENTER:
-        if (settingsValueChange > 0) {
+        if (change > 0) {
           buzzer->beep(BEEP_LOW_HZ, 1000, 0, 1);
           buzzer->handle();
           controls->setJoystickCenter();
@@ -534,7 +576,7 @@ void ControlPannel::handle() {
         axis = currentScreen - SCREEN_DUAL_RATE_A_X;
         addWithConstrain(
           settings->values.axes[axis].dualRate,
-          settingsValueChange * 10,
+          change * 10,
           DUAL_RATE_MIN,
           DUAL_RATE_MAX
         );
@@ -546,7 +588,7 @@ void ControlPannel::handle() {
         axis = currentScreen - SCREEN_TRIMMING_A_X;
         addWithConstrain(
           settings->values.axes[axis].trimming,
-          settingsValueChange * 5,
+          change * 5,
           TRIMMING_MIN,
           TRIMMING_MAX
         );
@@ -556,14 +598,14 @@ void ControlPannel::handle() {
       case SCREEN_INVERT_B_X:
       case SCREEN_INVERT_B_Y:
         axis = currentScreen - SCREEN_INVERT_A_X;
-        settings->values.axes[axis].joyInvert = settingsValueChange > 0;
+        settings->values.axes[axis].joyInvert = change > 0;
         break;
       case SCREEN_LOW_SWITCH_1:
       case SCREEN_LOW_SWITCH_2:
         sw = currentScreen - SCREEN_LOW_SWITCH_1;
         addWithConstrain(
           settings->values.switches[sw].low,
-          settingsValueChange * 50,
+          change * 50,
           SWITCH_MIN,
           SWITCH_MAX
         );
@@ -573,7 +615,7 @@ void ControlPannel::handle() {
         sw = currentScreen - SCREEN_HIGH_SWITCH_1;
         addWithConstrain(
           settings->values.switches[sw].high,
-          settingsValueChange * 50,
+          change * 50,
           SWITCH_MIN,
           SWITCH_MAX
         );
@@ -585,7 +627,7 @@ void ControlPannel::handle() {
         axis = currentScreen - SCREEN_CHANNEL_A_X;
         addWithConstrain(
           settings->values.axes[axis].channel,
-          settingsValueChange,
+          change,
           NO_CHANNEL,
           NUM_CHANNELS - 1
         );
@@ -595,7 +637,7 @@ void ControlPannel::handle() {
         sw = currentScreen - SCREEN_CHANNEL_SWITCH_1;
         addWithConstrain(
           settings->values.switches[sw].channel,
-          settingsValueChange,
+          change,
           NO_CHANNEL,
           NUM_CHANNELS - 1
         );
@@ -603,20 +645,20 @@ void ControlPannel::handle() {
       case SCREEN_BATTARY_LOW:
         addWithConstrain(
           settings->values.battaryLowMV,
-          settingsValueChange * 100,
+          change * 100,
           100,
           20000
         );
         break;
       case SCREEN_SAVE_FOR_NOLINK:
-        if (settingsValueChange > 0) {
+        if (change > 0) {
           radioControl->sendCommand(COMMAND_SAVE_FOR_NOLINK);
           buzzer->beep(BEEP_LOW_HZ, 250, 0, 1);
         }
         break;
       case SCREEN_SAVE:
         moveMenuTop();
-        if (settingsValueChange > 0) {
+        if (change > 0) {
           settings->saveProfile();
           buzzer->beep(BEEP_LOW_HZ, 500, 0, 1);
         }
@@ -626,14 +668,49 @@ void ControlPannel::handle() {
       case SCREEN_GROUP_CONTROLS:
       case SCREEN_GROUP_MAPPING:
       case SCREEN_GROUP_PEER:
-        if (settingsValueChange > 0) moveMenuDown();
+        if (change > 0) moveMenuDown();
         break;
       case SCREEN_MENU_UP:
         moveMenuUp();
         break;
 #endif
     }
-    redrawScreen();
+    needsRedraw = true;
+  }
+
+  switch (currentScreen) {
+    case SCREEN_PROFILE_NAME:
+    case SCREEN_PEER_ADDR:
+      if (bitRead(flags, FLAG_CURSOR_MOVE) && now - settingsChangeTime > 5000) {
+        bitClear(flags, FLAG_CURSOR_MOVE);
+        cursor++;
+        if (
+          (
+            currentScreen == SCREEN_PROFILE_NAME
+            && cursor >= sizeof(settings->values.profileName)
+          )
+          || (
+            currentScreen == SCREEN_PEER_ADDR
+            && cursor >= sizeof(settings->values.peer.address)
+          )
+        ) {
+          cursor = 0;
+        }
+      }
+      if ((now / 100) % 10 < 4) {
+        if (!bitRead(flags, FLAG_CURSOR_BLINK)) {
+          bitSet(flags, FLAG_CURSOR_BLINK);
+          needsRedraw = true;
+        }
+      } else {
+        if (bitRead(flags, FLAG_CURSOR_BLINK)) {
+          bitClear(flags, FLAG_CURSOR_BLINK);
+          needsRedraw = true;
+        }
+      }
+      break;
+    default:
+      if (cursor != 0) cursor = 0;
   }
 
   if (now - battaryUpdateTime > 5000) {
@@ -642,7 +719,7 @@ void ControlPannel::handle() {
     PRINT(F("This device battary (mV): "));
     PRINTLN(thisBattaryMV);
     if (currentScreen == SCREEN_BATTARY) {
-      redrawScreen();
+      needsRedraw = true;
     }
 
     if (
@@ -652,6 +729,8 @@ void ControlPannel::handle() {
       buzzer->beep(BEEP_LOW_HZ, 200, 100, 3);
     }
   }
+
+  if (needsRedraw) redrawScreen();
 }
 
 // vim:ai:sw=2:et

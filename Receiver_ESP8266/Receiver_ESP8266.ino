@@ -2,7 +2,7 @@
 #include <ESP_EEPROM.h>
 #include <espnow.h>
 #include <ESP8266WiFi.h>
-
+#include <Servo.h>
 #include <LowcostRC_Protocol.h>
 #include <LowcostRC_Console.h>
 
@@ -10,6 +10,9 @@
 #define SETTINGS_ADDR 0
 #define SETTINGS_MAGICK 0x1234
 #define PAIR_PIN D3
+#define CHANNEL1_PIN 4
+
+Servo channel1Servo;
 
 RequestPacket req;
 ResponsePacket resp;
@@ -52,6 +55,11 @@ bool loadSettings() {
 void saveSettings() {
   EEPROM.put(SETTINGS_ADDR, settings);
   EEPROM.commit();
+}
+
+void applyControl(ControlPacket *control) {
+  if (control->channels[CHANNEL1])
+    channel1Servo.writeMicroseconds(control->channels[CHANNEL1]);
 }
 
 void ensurePeerExist(uint8_t *mac, uint8_t wifiChannel) {
@@ -122,6 +130,8 @@ void OnDataRecv(uint8_t * mac,  uint8_t *incomingData, uint8_t len) {
   if (req.generic.packetType == PACKET_TYPE_CONTROL) {
     digitalWrite(LED_BUILTIN, LOW);
 
+    applyControl(&req.control);
+
     for (int channel = 0; channel < NUM_CHANNELS; channel++) {
       PRINT(F("ch"));
       PRINT(channel + 1);
@@ -156,6 +166,8 @@ void setup() {
   pinMode(PAIR_PIN, INPUT_PULLUP);
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
+
+  channel1Servo.attach(CHANNEL1_PIN);
 
   WiFi.mode(WIFI_STA);
   PRINT("MAC: ");
