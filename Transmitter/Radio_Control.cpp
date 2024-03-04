@@ -52,7 +52,7 @@ void RadioControl::sendPacket(const union RequestPacket *packet) {
     statusRadioFailure = true;
     statusRadioSuccess = false;
     
-    buzzer->beep(BEEP_HIGH_HZ, 3, 3, 1);
+    buzzer->beep(BEEP_HIGH_HZ, 5, 5, 1);
   }
 
   isStatusChanged = (

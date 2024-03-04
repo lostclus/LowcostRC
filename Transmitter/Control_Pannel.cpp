@@ -5,7 +5,7 @@
 
 #define DUAL_RATE_MIN    10
 #define DUAL_RATE_MAX  1500
-#define TRIMMING_MIN   1500
+#define TRIMMING_MIN   -1500
 #define TRIMMING_MAX   1500
 #define SWITCH_MIN        0
 #define SWITCH_MAX     3000
@@ -311,7 +311,7 @@ void ControlPannel::redrawScreen() {
       } else {
         sprintf_P(
           text,
-          PSTR("Channel %s\nNone"),
+          PSTR("Ch %s\nNone"),
           switchNames[sw]
         );
       }
@@ -531,11 +531,12 @@ void ControlPannel::handle() {
               ADDRESS_LENGTH
             );
             buzzer->beep(BEEP_LOW_HZ, 30, 30, 1);
+            settings->values.rfChannel = DEFAULT_RF_CHANNEL;
           } else {
-            buzzer->beep(BEEP_HIGH_HZ, 3, 30, 5);
+            buzzer->beep(BEEP_HIGH_HZ, 5, 30, 5);
           }
           bitClear(flags, FLAG_IS_PAIRING);
-          redrawScreen();
+          needsRedraw = true;
         } else {
           radioControl->radio->unpair();
           memcpy(
@@ -550,6 +551,7 @@ void ControlPannel::handle() {
         if (change) {
           addWithConstrain(settings->values.peer.address[cursor], change, 0x00, 0xff);
           radioControl->radio->setPeer(&settings->values.peer);
+          radioControl->radio->setRFChannel(settings->values.rfChannel);
           bitSet(flags, FLAG_CURSOR_MOVE);
         }
         break;
@@ -562,11 +564,9 @@ void ControlPannel::handle() {
         break;
       case SCREEN_AUTO_CENTER:
         if (change > 0) {
-          buzzer->beep(BEEP_LOW_HZ, 1000, 0, 1);
+          buzzer->beep(BEEP_LOW_HZ, 500, 0, 1);
           buzzer->handle();
           controls->setJoystickCenter();
-          buzzer->noBeep();
-          buzzer->handle();
         }
         break;
       case SCREEN_DUAL_RATE_A_X:
