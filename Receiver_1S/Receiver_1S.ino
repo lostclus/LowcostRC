@@ -49,8 +49,8 @@ unsigned long controlTime,
               sendTelemetryTime;
 bool isNoLink = false;
 
-Servo channel1Servo,
-      channel2Servo;
+Servo channel2Servo,
+      channel3Servo;
 NRF24Receiver receiver(RADIO_CE_PIN, RADIO_CSN_PIN);
 
 void setup(void) {
@@ -62,11 +62,12 @@ void setup(void) {
   analogReference(DEFAULT);
   randomSeed(analogRead(RANDOM_SEED_PIN));
 
-  channel1Servo.attach(CHANNEL1_PIN);
-  channel2Servo.attach(CHANNEL2_PIN);
+  pinMode(CHANNEL1_PIN, OUTPUT);
+  digitalWrite(CHANNEL1_PIN, LOW);
 
-  pinMode(CHANNEL3_PIN, OUTPUT);
-  digitalWrite(CHANNEL3_PIN, LOW);
+  channel2Servo.attach(CHANNEL2_PIN);
+  channel3Servo.attach(CHANNEL3_PIN);
+
 
   PRINTLN(F("Reading settings from flash ROM..."));
   EEPROM.get(SETTINGS_ADDR, settings);
@@ -151,18 +152,18 @@ void loop(void) {
 }
 
 void applyControl(ControlPacket *control) {
-  if (control->channels[CHANNEL1])
-    channel1Servo.writeMicroseconds(control->channels[CHANNEL1]);
-  if (control->channels[CHANNEL2])
-    channel2Servo.writeMicroseconds(control->channels[CHANNEL2]);
-
   analogWrite(
-    CHANNEL3_PIN,
+    CHANNEL1_PIN,
     map(
-      constrain(control->channels[CHANNEL3], ENGINE_POWER_MIN, ENGINE_POWER_MAX),
+      constrain(control->channels[CHANNEL1], ENGINE_POWER_MIN, ENGINE_POWER_MAX),
       ENGINE_POWER_MIN, ENGINE_POWER_MAX, 0, 255
     )
   );
+
+  if (control->channels[CHANNEL2])
+    channel2Servo.writeMicroseconds(control->channels[CHANNEL2]);
+  if (control->channels[CHANNEL3])
+    channel3Servo.writeMicroseconds(control->channels[CHANNEL3]);
 }
 
 void sendTelemetry() {
