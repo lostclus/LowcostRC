@@ -4,7 +4,7 @@
 #include <LowcostRC_Protocol.h>
 #include "Types.h"
 
-#define NUM_PROFILES 5
+#define NUM_PROFILES 8
 
 struct AxisSettings {
   uint16_t joyCenter,
