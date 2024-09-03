@@ -17,14 +17,16 @@ class RadioControl {
     SPIRadioModule spiRadio;
 #endif
     Buzzer *buzzer;
+    byte packetsFailureCount = 0,
+        packetsCount = 0,
+        prevLinkQuality = 0;
   public:
     BaseRadioModule *radio;
     struct TelemetryPacket telemetry;
     unsigned long requestSendTime = 0,
                   telemetryTime = 0,
                   errorTime = 0;
-    bool statusRadioSuccess = false,
-         statusRadioFailure = false;
+    byte linkQuality = 0;
 
     RadioControl(Buzzer *buzzer);
     void begin();

@@ -30,9 +30,6 @@ void RadioControl::sendCommand(Command command) {
 }
 
 void RadioControl::sendPacket(const union RequestPacket *packet) {
-  static bool prevStatusRadioSuccess = false,
-              prevStatusRadioFailure = false;
-  bool radioOK, isStatusChanged;
   unsigned long now = millis();
 
   PRINT(F("Sending packet type: "));
@@ -40,30 +37,27 @@ void RadioControl::sendPacket(const union RequestPacket *packet) {
   PRINT(F("; size: "));
   PRINTLN(sizeof(*packet));
 
-  radioOK = radio->send(packet);
-  if (radioOK) {
+  packetsCount++;
+
+  if (radio->send(packet)) {
     requestSendTime = now;
     errorTime = 0;
-    statusRadioSuccess = true;
-    statusRadioFailure = false;
   } else {
     if (errorTime == 0) errorTime = now;
     requestSendTime = 0;
-    statusRadioFailure = true;
-    statusRadioSuccess = false;
-    
-    buzzer->beep(BEEP_HIGH_HZ, 5, 5, 1);
+    packetsFailureCount++;
   }
 
-  isStatusChanged = (
-    statusRadioSuccess != prevStatusRadioSuccess
-    || statusRadioFailure != prevStatusRadioFailure
-  );
-  prevStatusRadioSuccess = statusRadioSuccess;
-  prevStatusRadioFailure = statusRadioFailure;
-
-  if (isStatusChanged && statusRadioSuccess) {
-    buzzer->beep(BEEP_LOW_HZ, 30, 30, 1);
+  if (packetsCount == 100) {
+    prevLinkQuality = linkQuality;
+    linkQuality = 100 - packetsFailureCount;
+    packetsCount = 0;
+    packetsFailureCount = 0;
+    if (linkQuality == 0) {
+      buzzer->beep(BEEP_HIGH_HZ, 5, 5, 1);
+    } else if (prevLinkQuality == 0) {
+      buzzer->beep(BEEP_LOW_HZ, 30, 30, 1);
+    }
   }
 }
 
@@ -72,11 +66,7 @@ void RadioControl::handle() {
   unsigned long now = millis();
 
   if (errorTime > 0 && now - errorTime > 250) {
-    statusRadioFailure = false;
     errorTime = 0;
-  }
-  if (requestSendTime > 0 && now - requestSendTime > 250) {
-    statusRadioSuccess = false;
   }
 
   if (radio->receive(&response)) {

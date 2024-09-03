@@ -26,7 +26,7 @@ using ButtonList = AblePullupClickerButtonList;
 enum ScreenEnum {
   SCREEN_NULL,
   SCREEN_BLANK,
-  SCREEN_BATTARY,
+  SCREEN_DISPLAY,
   SCREEN_PROFILE,
   SCREEN_PROFILE_NAME,
 

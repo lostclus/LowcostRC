@@ -66,7 +66,7 @@ const Screen peerMenu[] = {
 
 const Screen mainMenu[] = {
   SCREEN_BLANK,
-  SCREEN_BATTARY,
+  SCREEN_DISPLAY,
   SCREEN_PROFILE,
   SCREEN_PROFILE_NAME,
   SCREEN_GROUP_RADIO,
@@ -149,14 +149,20 @@ void ControlPannel::redrawScreen() {
   switch (currentScreen) {
     case SCREEN_BLANK:
       break;
-    case SCREEN_BATTARY:
+    case SCREEN_DISPLAY:
       sprintf_P(
         text,
-        PSTR("Battary\nT: %d.%03dV\nR: %d.%03dV"),
+        PSTR("=== %d. %s ===\n"
+             "TxBt: %d.%02dV\n"
+             "RxBt: %d.%02dV\n"
+             "LQI: %d%%"),
+        settings->currentProfile + 1,
+        settings->values.profileName,
         thisBattaryMV / 1000,
-        thisBattaryMV % 1000,
+        (thisBattaryMV % 1000) / 10,
         radioControl->telemetry.battaryMV / 1000,
-        radioControl->telemetry.battaryMV % 1000
+        (radioControl->telemetry.battaryMV % 1000) / 10,
+        radioControl->linkQuality
       );
       break;
     case SCREEN_PROFILE:
@@ -372,13 +378,21 @@ void ControlPannel::redrawScreen() {
 
 #if defined(WITH_ADAFRUIT_SSD1306)
   display.fillRect(0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, BLACK);
-  display.setTextSize(2);
+  if (currentScreen == SCREEN_DISPLAY) {
+    display.setTextSize(1);
+  } else {
+    display.setTextSize(2);
+  }
   display.setTextColor(WHITE);
   display.setCursor(0, 0);
   display.println(text);
   display.display();
 #elif defined(WITH_SSD1306_ASCII)
-  display.set2X();
+  if (currentScreen == SCREEN_DISPLAY) {
+    display.set1X();
+  } else {
+    display.set2X();
+  }
   display.clear();
   display.print(text);
 #endif
@@ -718,7 +732,7 @@ void ControlPannel::handle() {
     thisBattaryMV = getBattaryVoltage();
     PRINT(F("This device battary (mV): "));
     PRINTLN(thisBattaryMV);
-    if (currentScreen == SCREEN_BATTARY) {
+    if (currentScreen == SCREEN_DISPLAY) {
       needsRedraw = true;
     }
 

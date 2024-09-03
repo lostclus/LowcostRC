@@ -9,16 +9,27 @@
 #define ESP_OK 0
 #define SETTINGS_ADDR 0
 #define SETTINGS_MAGICK 0x1234
-#define PAIR_PIN D3
+#define PAIR_PIN 0
 #define CHANNEL1_PIN 4
+#define CHANNEL2_PIN 12
+#define CHANNEL3_PIN 14
 
-Servo channel1Servo;
+#define VOLT_METER_PIN A0
+#define VOLT_METER_R1 51100L
+#define VOLT_METER_R2 10000L
 
-RequestPacket req;
-ResponsePacket resp;
-unsigned long controlTime,
+Servo channel1Servo,
+      channel2Servo,
+      channel3Servo;
+
+RequestPacket request;
+ResponsePacket response;
+unsigned long requestTime,
+              processTime,
               sendTelemetryTime;
+uint8_t requestMac[6];
 bool isPairing = false;
+unsigned int battaryMV = 0;
 
 struct Settings {
   uint16_t magick;
@@ -60,6 +71,10 @@ void saveSettings() {
 void applyControl(ControlPacket *control) {
   if (control->channels[CHANNEL1])
     channel1Servo.writeMicroseconds(control->channels[CHANNEL1]);
+  if (control->channels[CHANNEL2])
+    channel2Servo.writeMicroseconds(control->channels[CHANNEL2]);
+  if (control->channels[CHANNEL3])
+    channel3Servo.writeMicroseconds(control->channels[CHANNEL3]);
 }
 
 void ensurePeerExist(uint8_t *mac, uint8_t wifiChannel) {
@@ -71,92 +86,130 @@ void ensurePeerExist(uint8_t *mac, uint8_t wifiChannel) {
 }
 
 void sendPairReadyResponse(uint8_t *mac, uint16_t session) {
-  resp.pair.packetType = PACKET_TYPE_PAIR;
-  resp.pair.status = PAIR_STATUS_READY;
-  resp.pair.session = session;
-  WiFi.macAddress(resp.pair.sender.address);
-  if (esp_now_send(mac, (uint8_t*)&resp, sizeof(resp)) != ESP_OK) {
+  response.pair.packetType = PACKET_TYPE_PAIR;
+  response.pair.status = PAIR_STATUS_READY;
+  response.pair.session = session;
+  WiFi.macAddress(response.pair.sender.address);
+  if (esp_now_send(mac, (uint8_t*)&response, sizeof(response)) != ESP_OK) {
     PRINTLN("Error sending pair ready response");
   }
 }
 
 void sendTelemetry(uint8_t *mac) {
-  resp.telemetry.packetType = PACKET_TYPE_TELEMETRY;
-  resp.telemetry.battaryMV = 3700;
-  if (esp_now_send(mac, (uint8_t*)&resp, sizeof(resp)) != ESP_OK) {
+  response.telemetry.packetType = PACKET_TYPE_TELEMETRY;
+
+  updateBattaryVoltage();
+
+  response.telemetry.battaryMV = battaryMV;
+  if (esp_now_send(mac, (uint8_t*)&response, sizeof(response)) != ESP_OK) {
     PRINTLN("Error sending telemetry");
   }
 }
 
 void OnDataRecv(uint8_t * mac,  uint8_t *incomingData, uint8_t len) {
-  unsigned long now = millis();
-
   if (len < sizeof(RequestPacket)) {
     PRINT("Invalid packet size: ");
     PRINTLN(len);
     return;
   }
 
-  memcpy(&req, incomingData, sizeof(RequestPacket));
+  memcpy(&request, incomingData, sizeof(RequestPacket));
+  memcpy(requestMac, mac, sizeof(requestMac));
+  requestTime = millis();
+}
+
+void processRequest() {
+  unsigned long now = millis();
+
+  processTime = now;
 
   if (!settings.isPaired) {
-    if (isPairing && req.pair.packetType == PACKET_TYPE_PAIR) {
-      if (req.pair.status == PAIR_STATUS_INIT) {
-	PRINTLN("Recived pair init packet");
-	ensurePeerExist(mac, rfChannelToWifi(DEFAULT_RF_CHANNEL));
-	sendPairReadyResponse(mac, req.pair.session);
-	return;
-      } else if (req.pair.status == PAIR_STATUS_PAIRED) {
-	PRINTLN("Paired");
-        isPairing = false;
-	settings.isPaired = true;
-	memcpy(settings.peer.address, mac, ADDRESS_LENGTH);
-	ensurePeerExist(mac, rfChannelToWifi(DEFAULT_RF_CHANNEL));
-	settings.rfChannel = DEFAULT_RF_CHANNEL;
-	saveSettings();
-	sendTelemetry(mac);
-	return;
+    if (isPairing && request.pair.packetType == PACKET_TYPE_PAIR) {
+      if (request.pair.status == PAIR_STATUS_INIT) {
+        PRINTLN("Recived pair init packet");
+        ensurePeerExist(requestMac, rfChannelToWifi(DEFAULT_RF_CHANNEL));
+        sendPairReadyResponse(requestMac, request.pair.session);
+        return;
+      } else if (request.pair.status == PAIR_STATUS_PAIRED) {
+        PRINTLN("Paired");
+              isPairing = false;
+        settings.isPaired = true;
+        memcpy(settings.peer.address, requestMac, ADDRESS_LENGTH);
+        ensurePeerExist(requestMac, rfChannelToWifi(DEFAULT_RF_CHANNEL));
+        settings.rfChannel = DEFAULT_RF_CHANNEL;
+        saveSettings();
+        sendTelemetry(requestMac);
+        return;
       }
     }
     PRINTLN("Ignoring packet in unpaired state");
     return;
   } else {
-    if (memcmp(mac, settings.peer.address, sizeof(settings.peer.address)) != 0) {
+    if (memcmp(requestMac, settings.peer.address, sizeof(settings.peer.address)) != 0) {
       PRINTLN("Ignoring packet from non-paired device");
       return;
     }
   }
 
-  if (req.generic.packetType == PACKET_TYPE_CONTROL) {
+  if (request.generic.packetType == PACKET_TYPE_CONTROL) {
     digitalWrite(LED_BUILTIN, LOW);
 
-    applyControl(&req.control);
+    applyControl(&request.control);
 
     for (int channel = 0; channel < NUM_CHANNELS; channel++) {
       PRINT(F("ch"));
       PRINT(channel + 1);
       PRINT(F(": "));
-      PRINT(req.control.channels[channel]);
+      PRINT(request.control.channels[channel]);
       if (channel < NUM_CHANNELS - 1) {
-	PRINT(F(", "));
+        PRINT(F(", "));
       } else {
-	PRINTLN();
+        PRINTLN();
       }
     }
 
     if (now - sendTelemetryTime > 5000) {
-      sendTelemetry(mac);
+      sendTelemetry(requestMac);
       sendTelemetryTime = now;
     }
 
     digitalWrite(LED_BUILTIN, HIGH);
-  } else if (req.generic.packetType == PACKET_TYPE_SET_RF_CHANNEL) {
-    settings.rfChannel = req.rfChannel.rfChannel;
+  } else if (request.generic.packetType == PACKET_TYPE_SET_RF_CHANNEL) {
+    settings.rfChannel = request.rfChannel.rfChannel;
     PRINT("New RF channel: ");
     PRINTLN(settings.rfChannel);
-    esp_now_set_peer_channel(mac, rfChannelToWifi(settings.rfChannel));
+    esp_now_set_peer_channel(requestMac, rfChannelToWifi(settings.rfChannel));
     saveSettings();
   }
+}
+
+unsigned long vHist[5] = {0, 0, 0, 0, 0};
+byte vHistPos = 0;
+
+void updateBattaryVoltage() {
+  byte i, count = 0;
+  unsigned long vpin, vsum = 0;
+
+  vpin = analogRead(VOLT_METER_PIN);
+
+  PRINT(F("vpin: "));
+  PRINTLN(vpin);
+
+  vHist[vHistPos] = vpin;
+  vHistPos = (vHistPos + 1) % (sizeof(vHist) / sizeof(vHist[0]));
+
+  for (i = 0; i < sizeof(vHist) / sizeof(vHist[0]); i++) {
+    if (vHist[i] > 0) {
+      vsum += vHist[i];
+      count += 1;
+    }
+  }
+
+  battaryMV = map(
+      vsum / count,
+      0, 1023,
+      0, 1000 * (1000L / (VOLT_METER_R2 * 1000L / (VOLT_METER_R1 + VOLT_METER_R2)))
+  );
 }
 
 void setup() {
@@ -168,6 +221,8 @@ void setup() {
   digitalWrite(LED_BUILTIN, HIGH);
 
   channel1Servo.attach(CHANNEL1_PIN);
+  channel2Servo.attach(CHANNEL2_PIN);
+  channel3Servo.attach(CHANNEL3_PIN);
 
   WiFi.mode(WIFI_STA);
   PRINT("MAC: ");
@@ -190,11 +245,14 @@ void setup() {
   esp_now_set_self_role(ESP_NOW_ROLE_COMBO);
   esp_now_register_recv_cb(OnDataRecv);
 
-  controlTime = 0;
+  requestTime = 0;
+  processTime = 0;
   sendTelemetryTime = 0;
 }
 
 void loop() {
+  if (requestTime > processTime)
+    processRequest();
   if (digitalRead(PAIR_PIN) == LOW && !isPairing) {
     isPairing = true;
     settings.isPaired = false;
