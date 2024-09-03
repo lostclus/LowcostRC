@@ -123,8 +123,8 @@ void loop(void) {
       settings.rfChannel = rp.rfChannel.rfChannel;
       EEPROM.put(SETTINGS_ADDR, settings);
     } else if (rp.generic.packetType == PACKET_TYPE_COMMAND) {
-      if (rp.command.command == COMMAND_SAVE_FOR_NOLINK && hasLastChannels) {
-        PRINT(F("Saving state for no link"));
+      if (rp.command.command == COMMAND_SAVE_FAILSAFE && hasLastChannels) {
+        PRINT(F("Saving state for failsafe"));
         rp.control.packetType = PACKET_TYPE_CONTROL;
         for (int channel = 0; channel < NUM_CHANNELS; channel++)
           rp.control.channels[channel] = lastChannels[channel];

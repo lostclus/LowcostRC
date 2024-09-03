@@ -59,7 +59,7 @@ const Screen mappingMenu[] = {
 
 const Screen peerMenu[] = {
   SCREEN_BATTARY_LOW,
-  SCREEN_SAVE_FOR_NOLINK,
+  SCREEN_SAVE_FAILSAFE,
   SCREEN_MENU_UP,
   SCREEN_NULL
 };
@@ -330,10 +330,10 @@ void ControlPannel::redrawScreen() {
         settings->values.battaryLowMV % 1000
       );
       break;
-    case SCREEN_SAVE_FOR_NOLINK:
+    case SCREEN_SAVE_FAILSAFE:
       sprintf_P(
         text,
-        PSTR("Save for\nno link?")
+        PSTR("Save failsafe?")
       );
       break;
     case SCREEN_SAVE:
@@ -664,9 +664,9 @@ void ControlPannel::handle() {
           20000
         );
         break;
-      case SCREEN_SAVE_FOR_NOLINK:
+      case SCREEN_SAVE_FAILSAFE:
         if (change > 0) {
-          radioControl->sendCommand(COMMAND_SAVE_FOR_NOLINK);
+          radioControl->sendCommand(COMMAND_SAVE_FAILSAFE);
           buzzer->beep(BEEP_LOW_HZ, 250, 0, 1);
         }
         break;

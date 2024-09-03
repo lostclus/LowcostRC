@@ -64,7 +64,7 @@ enum ScreenEnum {
 
   // Peer
   SCREEN_BATTARY_LOW,
-  SCREEN_SAVE_FOR_NOLINK,
+  SCREEN_SAVE_FAILSAFE,
 
   SCREEN_SAVE,
 
