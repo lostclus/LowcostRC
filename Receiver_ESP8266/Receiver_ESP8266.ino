@@ -14,12 +14,14 @@
 #define CHANNEL2_PIN 12
 #define CHANNEL3_PIN 14
 
+#define ENGINE_POWER_MIN 1000
+#define ENGINE_POWER_MAX 2000
+
 #define VOLT_METER_PIN A0
 #define VOLT_METER_R1 51100L
 #define VOLT_METER_R2 10000L
 
-Servo channel1Servo,
-      channel2Servo,
+Servo channel2Servo,
       channel3Servo;
 
 RequestPacket request;
@@ -69,8 +71,14 @@ void saveSettings() {
 }
 
 void applyControl(ControlPacket *control) {
-  if (control->channels[CHANNEL1])
-    channel1Servo.writeMicroseconds(control->channels[CHANNEL1]);
+  analogWrite(
+    CHANNEL1_PIN,
+    map(
+      constrain(control->channels[CHANNEL1], ENGINE_POWER_MIN, ENGINE_POWER_MAX),
+      ENGINE_POWER_MIN, ENGINE_POWER_MAX, 0, 255
+    )
+  );
+
   if (control->channels[CHANNEL2])
     channel2Servo.writeMicroseconds(control->channels[CHANNEL2]);
   if (control->channels[CHANNEL3])
@@ -90,6 +98,8 @@ void sendPairReadyResponse(uint8_t *mac, uint16_t session) {
   response.pair.status = PAIR_STATUS_READY;
   response.pair.session = session;
   WiFi.macAddress(response.pair.sender.address);
+
+  PRINTLN("Sending pair ready response");
   if (esp_now_send(mac, (uint8_t*)&response, sizeof(response)) != ESP_OK) {
     PRINTLN("Error sending pair ready response");
   }
@@ -220,7 +230,8 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
 
-  channel1Servo.attach(CHANNEL1_PIN);
+  pinMode(CHANNEL1_PIN, OUTPUT);
+  digitalWrite(CHANNEL1_PIN, LOW);
   channel2Servo.attach(CHANNEL2_PIN);
   channel3Servo.attach(CHANNEL3_PIN);
 
