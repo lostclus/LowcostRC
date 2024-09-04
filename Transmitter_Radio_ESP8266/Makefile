@@ -1,4 +1,4 @@
-BOARD=esp8266:esp8266:d1_mini
+BOARD=esp8266:esp8266:generic
 PORT=/dev/ttyUSB0
 EXTRA_FLAGS=
 WITH_CONSOLE=

@@ -51,40 +51,40 @@ typedef uint8_t PairStatus;
 
 struct Address {
   uint8_t address[ADDRESS_LENGTH];
-};
+} __attribute__((__packed__));
 
 typedef uint8_t RFChannel;
 
 struct GenericPacket {
   PacketType packetType;
-};
+} __attribute__((__packed__));
 
 struct ControlPacket {
   PacketType packetType;
   uint16_t channels[NUM_CHANNELS];
-};
+} __attribute__((__packed__));
 
 struct TelemetryPacket {
   PacketType packetType;
   uint16_t battaryMV;
-};
+} __attribute__((__packed__));
 
 struct SetRFChannelPacket {
   PacketType packetType;
   RFChannel rfChannel;
-};
+} __attribute__((__packed__));
 
 struct CommandPacket {
   PacketType packetType;
   Command command;
-};
+} __attribute__((__packed__));
 
 struct PairPacket {
   PacketType packetType;
   PairStatus status;
   uint16_t session;
   Address sender;
-};
+} __attribute__((__packed__));
 
 union RequestPacket {
   struct GenericPacket generic;
