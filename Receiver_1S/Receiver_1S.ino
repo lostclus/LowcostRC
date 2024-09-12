@@ -31,7 +31,7 @@ struct Settings {
   uint16_t magick;
   Address address;
   RFChannel rfChannel;
-  ControlPacket noLinkControl;
+  ControlPacket failsafe;
 } settings;
 
 const Settings defaultSettings PROGMEM = {
@@ -47,7 +47,7 @@ const Settings defaultSettings PROGMEM = {
 unsigned int battaryMV = 0;
 unsigned long controlTime,
               sendTelemetryTime;
-bool isNoLink = false;
+bool isFailsafe = false;
 
 Servo channel2Servo,
       channel3Servo;
@@ -96,7 +96,7 @@ void loop(void) {
   if (receiver.receive(&rp)) {
     if (rp.generic.packetType == PACKET_TYPE_CONTROL) {
       controlTime = now;
-      isNoLink = false;
+      isFailsafe = false;
 
       for (int channel = 0; channel < NUM_CHANNELS; channel++)
         lastChannels[channel] = rp.control.channels[channel];
@@ -128,7 +128,7 @@ void loop(void) {
         rp.control.packetType = PACKET_TYPE_CONTROL;
         for (int channel = 0; channel < NUM_CHANNELS; channel++)
           rp.control.channels[channel] = lastChannels[channel];
-        memcpy(&settings.noLinkControl, &rp.control, sizeof(ControlPacket));
+        memcpy(&settings.failsafe, &rp.control, sizeof(ControlPacket));
         EEPROM.put(SETTINGS_ADDR, settings);
       }
     }
@@ -140,10 +140,10 @@ void loop(void) {
   }
 
 
-  if (!isNoLink && controlTime > 0 && now - controlTime > 1250) {
+  if (!isFailsafe && controlTime > 0 && now - controlTime > 1250) {
     PRINTLN(F("Radio signal lost"));
-    isNoLink = true;
-    applyControl(&settings.noLinkControl);
+    isFailsafe = true;
+    applyControl(&settings.failsafe);
   }
 
   if (digitalRead(PAIR_PIN) == LOW) {
