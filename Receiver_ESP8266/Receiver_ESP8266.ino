@@ -8,7 +8,7 @@
 
 #define ESP_OK 0
 #define SETTINGS_ADDR 0
-#define SETTINGS_MAGICK 0x1234
+#define SETTINGS_MAGICK 0x5501
 #define PAIR_PIN 0
 #define CHANNEL1_PIN 4
 #define CHANNEL2_PIN 12
@@ -30,7 +30,8 @@ unsigned long requestTime,
               processTime,
               sendTelemetryTime;
 uint8_t requestMac[6];
-bool isPairing = false;
+bool isPairing = false,
+     isFailsafe = false;
 unsigned int battaryMV = 0;
 
 struct Settings {
@@ -38,13 +39,18 @@ struct Settings {
   bool isPaired;
   Address peer;
   RFChannel rfChannel;
+  ControlPacket failsafe;
 } settings;
 
 const struct Settings defaultSettings = {
   SETTINGS_MAGICK,
   false,
   ADDRESS_NONE,
-  DEFAULT_RF_CHANNEL
+  DEFAULT_RF_CHANNEL,
+  {
+    PACKET_TYPE_CONTROL,
+    {0, 1500, 1500, 1500}
+  }
 };
 
 uint8_t rfChannelToWifi(RFChannel ch) {
@@ -126,10 +132,13 @@ void OnDataRecv(uint8_t * mac,  uint8_t *incomingData, uint8_t len) {
   memcpy(&request, incomingData, sizeof(RequestPacket));
   memcpy(requestMac, mac, sizeof(requestMac));
   requestTime = millis();
+  isFailsafe = false;
 }
 
 void processRequest() {
   unsigned long now = millis();
+  static int lastChannels[NUM_CHANNELS];
+  static bool hasLastChannels = false;
 
   processTime = now;
 
@@ -166,6 +175,10 @@ void processRequest() {
 
     applyControl(&request.control);
 
+    for (int channel = 0; channel < NUM_CHANNELS; channel++)
+      lastChannels[channel] = request.control.channels[channel];
+    hasLastChannels = true;
+
     for (int channel = 0; channel < NUM_CHANNELS; channel++) {
       PRINT(F("ch"));
       PRINT(channel + 1);
@@ -190,6 +203,15 @@ void processRequest() {
     PRINTLN(settings.rfChannel);
     esp_now_set_peer_channel(requestMac, rfChannelToWifi(settings.rfChannel));
     saveSettings();
+  } else if (request.generic.packetType == PACKET_TYPE_COMMAND) {
+    if (request.command.command == COMMAND_SAVE_FAILSAFE && hasLastChannels) {
+      PRINT(F("Saving state for failsafe"));
+      request.control.packetType = PACKET_TYPE_CONTROL;
+      for (int channel = 0; channel < NUM_CHANNELS; channel++)
+        request.control.channels[channel] = lastChannels[channel];
+      memcpy(&settings.failsafe, &request.control, sizeof(ControlPacket));
+      saveSettings();
+    }
   }
 }
 
@@ -264,6 +286,13 @@ void setup() {
 void loop() {
   if (requestTime > processTime)
     processRequest();
+
+  if (!isFailsafe && requestTime > 0 && millis() - requestTime > 1250) {
+    PRINTLN(F("Radio signal lost"));
+    isFailsafe = true;
+    applyControl(&settings.failsafe);
+  }
+
   if (digitalRead(PAIR_PIN) == LOW && !isPairing) {
     isPairing = true;
     settings.isPaired = false;
