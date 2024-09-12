@@ -107,7 +107,8 @@ class ControlPannel {
            settingsPlusButton,
            settingsMinusButton;
     unsigned long battaryUpdateTime = 0,
-                  settingsChangeTime = 0;
+                  settingsChangeTime = 0,
+                  redrawTime = 0;
     unsigned int thisBattaryMV = 0;
     uint8_t flags = 0,
             cursor = 0;

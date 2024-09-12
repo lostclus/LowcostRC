@@ -396,6 +396,7 @@ void ControlPannel::redrawScreen() {
   display.clear();
   display.print(text);
 #endif
+  redrawTime = millis();
 }
 
 void ControlPannel::moveMenuTop() {
@@ -727,15 +728,11 @@ void ControlPannel::handle() {
       if (cursor != 0) cursor = 0;
   }
 
-  if (now - battaryUpdateTime > 5000) {
+  if (now - battaryUpdateTime > BATTARY_MONITOR_INTERVAL) {
     battaryUpdateTime = now;
     thisBattaryMV = getBattaryVoltage();
     PRINT(F("This device battary (mV): "));
     PRINTLN(thisBattaryMV);
-    if (currentScreen == SCREEN_DISPLAY) {
-      needsRedraw = true;
-    }
-
     if (
       radioControl->telemetry.battaryMV > 0
       && radioControl->telemetry.battaryMV < settings->values.battaryLowMV
@@ -743,6 +740,12 @@ void ControlPannel::handle() {
       buzzer->beep(BEEP_LOW_HZ, 200, 100, 3);
     }
   }
+
+  if (
+      now - redrawTime > SCREEN_DISPLAY_REDRAW_INTERVAL
+      && currentScreen == SCREEN_DISPLAY
+  )
+    needsRedraw = true;
 
   if (needsRedraw) redrawScreen();
 }

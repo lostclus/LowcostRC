@@ -53,9 +53,9 @@ void RadioControl::sendPacket(const union RequestPacket *packet) {
     linkQuality = 100 - packetsFailureCount;
     packetsCount = 0;
     packetsFailureCount = 0;
-    if (linkQuality == 0) {
+    if (linkQuality < MIN_LINK_QUALITY) {
       buzzer->beep(BEEP_HIGH_HZ, 5, 5, 1);
-    } else if (prevLinkQuality == 0) {
+    } else if (prevLinkQuality < MIN_LINK_QUALITY) {
       buzzer->beep(BEEP_LOW_HZ, 30, 30, 1);
     }
   }
