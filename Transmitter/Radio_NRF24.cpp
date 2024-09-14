@@ -21,7 +21,7 @@ bool NRF24RadioModule::begin() {
   rf24.setRadiation(RF24_PA_MAX, RF24_250KBPS);
   rf24.setPayloadSize(PACKET_SIZE);
   rf24.enableAckPayload();
-  rf24.setRetries(1, 1);
+  rf24.setRetries(5, 3);
   return true;
 }
 
