@@ -27,6 +27,8 @@ enum ChannelNEnum {
   CHANNEL4,
   CHANNEL5,
   CHANNEL6,
+  CHANNEL7,
+  CHANNEL8,
   NUM_CHANNELS,
   NO_CHANNEL = -1
 };

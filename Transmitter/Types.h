@@ -12,6 +12,8 @@ enum Axis {
 enum Switch {
   SWITCH_1,
   SWITCH_2,
+  SWITCH_3,
+  SWITCH_4,
   SWITCHES_COUNT,
 };
 

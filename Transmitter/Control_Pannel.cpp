@@ -40,8 +40,12 @@ const Screen controlsMenu[] = {
   SCREEN_INVERT_B_Y,
   SCREEN_LOW_SWITCH_1,
   SCREEN_LOW_SWITCH_2,
+  SCREEN_LOW_SWITCH_3,
+  SCREEN_LOW_SWITCH_4,
   SCREEN_HIGH_SWITCH_1,
   SCREEN_HIGH_SWITCH_2,
+  SCREEN_HIGH_SWITCH_3,
+  SCREEN_HIGH_SWITCH_4,
   SCREEN_MENU_UP,
   SCREEN_NULL
 };
@@ -53,6 +57,8 @@ const Screen mappingMenu[] = {
   SCREEN_CHANNEL_B_Y,
   SCREEN_CHANNEL_SWITCH_1,
   SCREEN_CHANNEL_SWITCH_2,
+  SCREEN_CHANNEL_SWITCH_3,
+  SCREEN_CHANNEL_SWITCH_4,
   SCREEN_MENU_UP,
   SCREEN_NULL
 };
@@ -141,8 +147,7 @@ void ControlPannel::redrawScreen() {
   char text[50] = "",
        yStr[] = "y",
        nStr[] = "n",
-       axisNames[][3] = {"AX", "AY", "BX", "BY"},
-       switchNames[][4] = {"SW1", "SW2"};
+       axisNames[][3] = {"AX", "AY", "BX", "BY"};
   Axis axis;
   Switch sw;
 
@@ -266,21 +271,25 @@ void ControlPannel::redrawScreen() {
       break;
     case SCREEN_LOW_SWITCH_1:
     case SCREEN_LOW_SWITCH_2:
+    case SCREEN_LOW_SWITCH_3:
+    case SCREEN_LOW_SWITCH_4:
       sw = currentScreen - SCREEN_LOW_SWITCH_1;
       sprintf_P(
         text,
-        PSTR("Low %s\n%d"),
-        switchNames[sw],
+        PSTR("Low SW%d\n%d"),
+        sw + 1,
         settings->values.switches[sw].low
       );
       break;
     case SCREEN_HIGH_SWITCH_1:
     case SCREEN_HIGH_SWITCH_2:
+    case SCREEN_HIGH_SWITCH_3:
+    case SCREEN_HIGH_SWITCH_4:
       sw = currentScreen - SCREEN_HIGH_SWITCH_1;
       sprintf_P(
         text,
-        PSTR("High %s\n%d"),
-        switchNames[sw],
+        PSTR("High SW%d\n%d"),
+        sw + 1,
         settings->values.switches[sw].high
       );
       break;
@@ -306,19 +315,21 @@ void ControlPannel::redrawScreen() {
       break;
     case SCREEN_CHANNEL_SWITCH_1:
     case SCREEN_CHANNEL_SWITCH_2:
+    case SCREEN_CHANNEL_SWITCH_3:
+    case SCREEN_CHANNEL_SWITCH_4:
       sw = currentScreen - SCREEN_CHANNEL_SWITCH_1;
       if (settings->values.switches[sw].channel != NO_CHANNEL) {
         sprintf_P(
           text,
-          PSTR("Ch %s\n%d"),
-          switchNames[sw],
+          PSTR("Ch SW%d\n%d"),
+          sw + 1,
           settings->values.switches[sw].channel + 1
         );
       } else {
         sprintf_P(
           text,
-          PSTR("Ch %s\nNone"),
-          switchNames[sw]
+          PSTR("Ch SW%d\nNone"),
+          sw + 1
         );
       }
       break;
@@ -617,6 +628,8 @@ void ControlPannel::handle() {
         break;
       case SCREEN_LOW_SWITCH_1:
       case SCREEN_LOW_SWITCH_2:
+      case SCREEN_LOW_SWITCH_3:
+      case SCREEN_LOW_SWITCH_4:
         sw = currentScreen - SCREEN_LOW_SWITCH_1;
         addWithConstrain(
           settings->values.switches[sw].low,
@@ -627,6 +640,8 @@ void ControlPannel::handle() {
         break;
       case SCREEN_HIGH_SWITCH_1:
       case SCREEN_HIGH_SWITCH_2:
+      case SCREEN_HIGH_SWITCH_3:
+      case SCREEN_HIGH_SWITCH_4:
         sw = currentScreen - SCREEN_HIGH_SWITCH_1;
         addWithConstrain(
           settings->values.switches[sw].high,
@@ -649,6 +664,8 @@ void ControlPannel::handle() {
         break;
       case SCREEN_CHANNEL_SWITCH_1:
       case SCREEN_CHANNEL_SWITCH_2:
+      case SCREEN_CHANNEL_SWITCH_3:
+      case SCREEN_CHANNEL_SWITCH_4:
         sw = currentScreen - SCREEN_CHANNEL_SWITCH_1;
         addWithConstrain(
           settings->values.switches[sw].channel,

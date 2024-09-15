@@ -21,7 +21,8 @@ void Controls::begin() {
     pinMode(joystickPins[axis], INPUT);
   }
   for (int sw = 0; sw < SWITCHES_COUNT; sw++) {
-    pinMode(switchPins[sw], INPUT_PULLUP);
+    if (!IS_ANALOG_SWITCH(sw))
+      pinMode(switchPins[sw], INPUT_PULLUP);
   }
 }
 
@@ -86,10 +87,19 @@ void Controls::setJoystickCenter() {
 }
 
 int Controls::readSwitch(Switch sw) {
-  return (
-    (digitalRead(switchPins[sw]) == LOW) ?
-    settings->values.switches[sw].high : settings->values.switches[sw].low
-  );
+  if (IS_ANALOG_SWITCH(sw)) {
+    return map(
+      analogRead(switchPins[sw]),
+      0, 1023,
+      settings->values.switches[sw].low, settings->values.switches[sw].high
+    );
+  }
+  else {
+    return (
+      (digitalRead(switchPins[sw]) == LOW) ?
+      settings->values.switches[sw].high : settings->values.switches[sw].low
+    );
+  }
 }
 
 void Controls::handle() {

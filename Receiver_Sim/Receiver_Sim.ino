@@ -28,7 +28,10 @@ const Settings defaultSettings PROGMEM = {
   DEFAULT_RF_CHANNEL,
   {
     PACKET_TYPE_CONTROL,
-    {1500, 1500, 1500, 1500}
+    {
+      1500, 1500, 1500, 1500,
+      1000, 1000, 1000, 1000
+    }
   }
 };
 
@@ -43,9 +46,17 @@ Joystick_ Joystick(
   JOYSTICK_DEFAULT_REPORT_ID, 
   JOYSTICK_TYPE_MULTI_AXIS,
   0, 0,
-  true, true, false,
-  false, false, false,
-  true, true, false, false, false
+  true, // X
+  true, // Y
+  true, // Z
+  true, // Rx
+  true, // Ry
+  true, // Rz
+  true, // Rubber
+  true, // Throttle
+  false, // Accelerator
+  false, // Brake
+  false // Steering
 );
 
 void setup(void) {
@@ -57,10 +68,14 @@ void setup(void) {
   randomSeed(analogRead(RANDOM_SEED_PIN));
 
   Joystick.begin(false);
-  Joystick.setRudderRange(1000, 2000);
-  Joystick.setThrottleRange(1000, 2000);
   Joystick.setXAxisRange(1000, 2000);
   Joystick.setYAxisRange(1000, 2000);
+  Joystick.setZAxisRange(1000, 2000);
+  Joystick.setRxAxisRange(1000, 2000);
+  Joystick.setRyAxisRange(1000, 2000);
+  Joystick.setRzAxisRange(1000, 2000);
+  Joystick.setRudderRange(1000, 2000);
+  Joystick.setThrottleRange(1000, 2000);
 
   PRINTLN(F("Reading settings from flash ROM..."));
   EEPROM.get(SETTINGS_ADDR, settings);
@@ -107,7 +122,19 @@ void loop(void) {
         PRINT(rp.control.channels[CHANNEL3]);
         PRINT(F(", "));
         PRINT(F("ch4: "));
-        PRINTLN(rp.control.channels[CHANNEL4]);
+        PRINT(rp.control.channels[CHANNEL4]);
+        PRINT(F(", "));
+        PRINT(F("ch5: "));
+        PRINT(rp.control.channels[CHANNEL5]);
+        PRINT(F(", "));
+        PRINT(F("ch6: "));
+        PRINT(rp.control.channels[CHANNEL6]);
+        PRINT(F(", "));
+        PRINT(F("ch7: "));
+        PRINT(rp.control.channels[CHANNEL7]);
+        PRINT(F(", "));
+        PRINT(F("ch8: "));
+        PRINTLN(rp.control.channels[CHANNEL7]);
       }
       #endif
 
@@ -147,10 +174,14 @@ void loop(void) {
 }
 
 void applyControl(ControlPacket *control) {
-  Joystick.setRudder(control->channels[CHANNEL1]);
-  Joystick.setThrottle(control->channels[CHANNEL2]);
+  Joystick.setZAxis(control->channels[CHANNEL1]);
+  Joystick.setRxAxis(control->channels[CHANNEL2]);
   Joystick.setXAxis(control->channels[CHANNEL3]);
   Joystick.setYAxis(control->channels[CHANNEL4]);
+  Joystick.setRyAxis(control->channels[CHANNEL5]);
+  Joystick.setRzAxis(control->channels[CHANNEL6]);
+  Joystick.setRudder(control->channels[CHANNEL7]);
+  Joystick.setThrottle(control->channels[CHANNEL8]);
   Joystick.sendState();
 }
 

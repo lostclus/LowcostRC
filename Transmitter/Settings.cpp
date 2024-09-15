@@ -4,7 +4,7 @@
 #include <LowcostRC_Console.h>
 #include "Settings.h"
 
-#define SETTINGS_MAGICK 0x5559
+#define SETTINGS_MAGICK 0x555a
 #define PROFILES_ADDR 0
 #define SETTINGS_SIZE sizeof(SettingsValues)
 
@@ -12,7 +12,7 @@
 #define DEFAULT_JOY_CENTER      512
 #define DEFAULT_JOY_THRESHOLD   1
 #define DEFAULT_JOY_INVERT      false
-#define DEFAULT_DUAL_RATE       900
+#define DEFAULT_DUAL_RATE       500
 #define DEFAULT_TRIMMING        0
 #define DEFAULT_SWITCH_LOW      1000
 #define DEFAULT_SWITCH_HIGH     2000
@@ -69,6 +69,16 @@ const SettingsValues defaultSettingsValues PROGMEM = {
       DEFAULT_SWITCH_LOW,
       DEFAULT_SWITCH_HIGH,
       CHANNEL6
+    },
+    {
+      DEFAULT_SWITCH_LOW,
+      DEFAULT_SWITCH_HIGH,
+      CHANNEL7
+    },
+    {
+      DEFAULT_SWITCH_LOW,
+      DEFAULT_SWITCH_HIGH,
+      CHANNEL8
     }
   }
 };

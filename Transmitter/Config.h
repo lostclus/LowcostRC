@@ -4,9 +4,10 @@
 #define BUZZER_PIN          3
 
 #define JOYSTICK_PINS       {A1, A0, A3, A2}
-#define SWITCH_PINS         {4, 5}
+#define SWITCH_PINS         {2, 4, 5, A6}
+#define IS_ANALOG_SWITCH(n) (n == SWITCH_4)
 
-#define VOLT_METER_PIN      A6
+#define VOLT_METER_PIN      A7
 #define VOLT_METER_R1       10000L
 #define VOLT_METER_R2       10000L
 
