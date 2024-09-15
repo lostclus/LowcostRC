@@ -28,11 +28,11 @@
 #define WITH_SSD1306_ASCII
 #endif
 
-#define SETTINGS_PIN        6
-#define SETTINGS_PLUS_PIN   7
-#define SETTINGS_MINUS_PIN  8
+#define KEY_SCREEN_PIN      6
+#define KEY_PLUS_PIN        7
+#define KEY_MINUS_PIN       8
 
-#define MIN_LINK_QUALITY 5
+#define MIN_LINK_QUALITY    5
 #define BATTARY_MONITOR_INTERVAL 5000
 #define SCREEN_DISPLAY_REDRAW_INTERVAL 1000
 

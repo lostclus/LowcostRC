@@ -102,20 +102,20 @@ ControlPannel::ControlPannel(
 #elif defined(WITH_SSD1306_ASCII)
   , display()
 #endif
-  , settingsButton(SETTINGS_PIN)
-  , settingsPlusButton(SETTINGS_PLUS_PIN)
-  , settingsMinusButton(SETTINGS_MINUS_PIN)
+  , screenButton(KEY_SCREEN_PIN)
+  , plusButton(KEY_PLUS_PIN)
+  , minusButton(KEY_MINUS_PIN)
 {
   moveMenuTop();
 }
 
 void ControlPannel::begin() {
-  settingsButton.begin();
-  settingsButton.setDebounceTime(20);
-  settingsPlusButton.begin();
-  settingsPlusButton.setDebounceTime(20);
-  settingsMinusButton.begin();
-  settingsMinusButton.setDebounceTime(20);
+  screenButton.begin();
+  screenButton.setDebounceTime(20);
+  plusButton.begin();
+  plusButton.setDebounceTime(20);
+  minusButton.begin();
+  minusButton.setDebounceTime(20);
 
 #if defined(WITH_ADAFRUIT_SSD1306)
   if (!display.begin(SSD1306_SWITCHCAPVCC, DISPLAY_ADDRESS)) {
@@ -472,11 +472,11 @@ void ControlPannel::handle() {
   bool needsRedraw = false;
   unsigned long now = millis();
 
-  settingsButton.handle();
-  settingsPlusButton.handle();
-  settingsMinusButton.handle();
+  screenButton.handle();
+  plusButton.handle();
+  minusButton.handle();
 
-  if (settingsButton.resetClicked()) {
+  if (screenButton.resetClicked()) {
     if (bitRead(flags, FLAG_SETTINGS_LONG_PRESS)) {
       bitClear(flags, FLAG_SETTINGS_LONG_PRESS);
     } else {
@@ -484,7 +484,7 @@ void ControlPannel::handle() {
     }
   }
 
-  if (settingsButton.isHeld() && currentScreen != SCREEN_BLANK) {
+  if (screenButton.isHeld() && currentScreen != SCREEN_BLANK) {
     moveMenuTop();
     bitSet(flags, FLAG_SETTINGS_LONG_PRESS);
   }
@@ -496,15 +496,15 @@ void ControlPannel::handle() {
   }
 
   if (
-    settingsPlusButton.resetClicked()
-    || (settingsPlusButton.isHeld() && now - settingsChangeTime > 200)
+    plusButton.resetClicked()
+    || (plusButton.isHeld() && now - settingsChangeTime > 200)
   ) {
     change = 1;
     settingsChangeTime = now;
   }
   if (
-    settingsMinusButton.resetClicked()
-    || (settingsMinusButton.isHeld() && now - settingsChangeTime > 200)
+    minusButton.resetClicked()
+    || (minusButton.isHeld() && now - settingsChangeTime > 200)
   ) {
     change = -1;
     settingsChangeTime = now;

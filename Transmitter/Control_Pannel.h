@@ -103,9 +103,9 @@ class ControlPannel {
     SSD1306AsciiWire display;
 #endif
 
-    Button settingsButton,
-           settingsPlusButton,
-           settingsMinusButton;
+    Button screenButton,
+           plusButton,
+           minusButton;
     unsigned long battaryUpdateTime = 0,
                   settingsChangeTime = 0,
                   redrawTime = 0;
