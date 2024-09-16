@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-const size_t PACKET_SIZE = 16;
+const size_t PACKET_SIZE = 18;
 
 #define ADDRESS_LENGTH 6
 #define ADDRESS_NONE {{0, 0, 0, 0, 0, 0}}
