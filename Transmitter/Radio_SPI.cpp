@@ -156,7 +156,7 @@ bool SPIRadioModule::send(const union RequestPacket *packet) {
 bool SPIRadioModule::pair() {
   ResponsePacket resp;
 
-  PRINT(F("SPI: Starting pairing"));
+  PRINTLN(F("SPI: Starting pairing"));
   writeStatus(SPI_STATUS_PAIRING);
 
   for (

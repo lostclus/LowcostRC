@@ -147,25 +147,23 @@ void Controls::handle() {
   );
 
   if (isChanged || isPing || isRetry) {
+#ifdef WITH_CONSOLE
     PRINT(F("isChanged: "));
     PRINT(isChanged);
     PRINT(F("; isPing: "));
     PRINT(isPing);
     PRINT(F("; isRetry: "));
-    PRINTLN(isRetry);
+    PRINT(isRetry);
 
-    PRINT(F("ch1: "));
-    PRINT(rp.control.channels[CHANNEL1]);
-    PRINT(F("; ch2: "));
-    PRINT(rp.control.channels[CHANNEL2]);
-    PRINT(F("; ch3: "));
-    PRINT(rp.control.channels[CHANNEL3]);
-    PRINT(F("; ch4: "));
-    PRINT(rp.control.channels[CHANNEL4]);
-    PRINT(F("; ch5: "));
-    PRINT(rp.control.channels[CHANNEL5]);
-    PRINT(F("; ch6: "));
-    PRINTLN(rp.control.channels[CHANNEL6]);
+    for (int channel = 0; channel < NUM_CHANNELS; channel++) {
+      PRINT(F("; ch"));
+      PRINT(channel + 1);
+      PRINT(F(": "));
+      PRINT(rp.control.channels[channel]);
+    }
+
+    PRINTLN();
+#endif
 
     radioControl->sendPacket(&rp);
   }
