@@ -1,6 +1,6 @@
 # LowcostRC
 
-LowcostRC is low price remote control for Arduino project.
+LowcostRC is low price remote control system based on Arduino.
 
 <img src="Documentation/Images/Transmitter.jpg" width="300" height="200">
 
@@ -8,15 +8,15 @@ LowcostRC is low price remote control for Arduino project.
 
 The following main components are used for the transmitter:
 
-- Arduino PRO Mini as main MCU
+- Arduino Pro Mini as main MCU
 - NRF24L01 or ESP8266 as radio module
 - 0.96" SSD1306 OLED Display
 - Two 2-axis joysticks
 
-Receiver can be builded using Arduino + NRF24L01 or a single ESP8266.
+Receiver can be build using Arduino + NRF24L01 or a single ESP8266.
 
 ## Transmitter features
-
+ 
 - 8 channels
 - Pluggable radio modules (NRF24L01 or ESP8266)
 - User interface with monochrome display and 3 buttons
@@ -45,6 +45,11 @@ Sample receiver sketch for plane. 2S power, NRF24L01 radio, brushless motor.
 
 `Receiver_ESP8266`:
 Sample receiver sketch for plane. 1S power, ESP8266 radio, brushed motor.
+
+`Receiver_Sim`:
+Sample receiver sketch to use with flight simulator on PC. Based on Arduino
+Micro and NRF24L01. Arduino connects to PC using USB cable and recognized as
+gamepad device with 8 axis.
 
 `Documentation/Schematics`:
 Schematics
