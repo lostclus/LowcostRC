@@ -60,9 +60,10 @@ Joystick_ Joystick(
 );
 
 void setup(void) {
-  #ifdef WITH_CONSOLE
+#ifdef WITH_CONSOLE
+  delay(2000);
   Serial.begin(115200);
-  #endif
+#endif
 
   pinMode(PAIR_PIN, INPUT_PULLUP);
   randomSeed(analogRead(RANDOM_SEED_PIN));

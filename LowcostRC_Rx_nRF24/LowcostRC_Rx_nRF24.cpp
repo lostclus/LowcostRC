@@ -2,7 +2,8 @@
 #include <LowcostRC_Console.h>
 
 NRF24Receiver::NRF24Receiver(uint8_t cepin, uint8_t cspin)
-  : rf24(cepin, cspin)
+  : rf24(cepin, cspin),
+    address(ADDRESS_NONE)
 {
 }
 
@@ -34,13 +35,14 @@ void NRF24Receiver::configure(const Address *addr, RFChannel ch) {
     addr->address[4],
     addr->address[5]
   );
-#endif
-  PRINT(F("Addr: "));
-  PRINTLN(text);
-  PRINT(F("RF channel: "));
-  PRINTLN(ch);
-  PRINT(F("NRF24 channel: "));
+  PRINT(F("Config: "));
+  PRINT(F("addr: "));
+  PRINT(text);
+  PRINT(F("; RF channel: "));
+  PRINT(ch);
+  PRINT(F(": NRF24 channel: "));
   PRINTLN(rfChannelToNRF24(ch));
+#endif
 }
 
 bool NRF24Receiver::begin(const Address *addr, RFChannel ch) {
@@ -50,9 +52,23 @@ bool NRF24Receiver::begin(const Address *addr, RFChannel ch) {
   }
   PRINTLN(F("NRF24: init: OK"));
 
-  memcpy(&address, addr, sizeof(Address));
-  configure(&address, ch);
+  memcpy(address.address, addr->address, ADDRESS_LENGTH);
+  rfChannel = ch;
+
+  configure(&address, rfChannel);
   return true;
+}
+
+const Address *NRF24Receiver::getAddress() {
+  return &address;
+}
+
+const Address *NRF24Receiver::getPeerAddress() {
+  return &address;
+}
+
+RFChannel NRF24Receiver::getRFChannel() {
+  return rfChannel;
 }
 
 void NRF24Receiver::setRFChannel(RFChannel ch) {
@@ -75,7 +91,9 @@ void NRF24Receiver::send(const ResponsePacket *packet) {
 
 bool NRF24Receiver::pair() {
   Address broadcast = ADDRESS_BROADCAST;
-  RequestPacket packet;
+  RequestPacket req;
+  ResponsePacket resp;
+  int readyCount = 0;
 
   PRINTLN(F("NRF24: Starting pairing"));
   rf24.stopListening();
@@ -84,30 +102,48 @@ bool NRF24Receiver::pair() {
   for (
     unsigned long start = millis();
     millis() - start < 10000;
-    delay(5)
   ) {
     if (rf24.available()) {
-      rf24.read(&packet, sizeof(packet));
-      if (packet.pair.packetType != PACKET_TYPE_PAIR) continue;
+      rf24.read(&req, sizeof(RequestPacket));
 
-      if (packet.pair.status == PAIR_STATUS_INIT) {
+      if (req.pair.packetType != PACKET_TYPE_PAIR) {
+        PRINTLN("NRF24: Ignoring non-pair type packet");
+        continue;
+      }
+
+      readyCount = 0;
+
+      if (req.pair.status == PAIR_STATUS_INIT) {
         PRINT(F("NRF24: Ready to pair in session: "));
-        PRINTLN(packet.pair.session);
-
-        packet.pair.status = PAIR_STATUS_READY;
-        memcpy(&packet.pair.sender, &address, sizeof(address));
-        rf24.writeAckPayload(1, &packet, sizeof(packet));
-      } else if (packet.pair.status == PAIR_STATUS_PAIRED) {
+        PRINTLN(req.pair.session);
+        resp.pair.packetType = PACKET_TYPE_PAIR;
+        resp.pair.status = PAIR_STATUS_READY;
+        resp.pair.session = req.pair.session;
+        memcpy(resp.pair.sender.address, address.address, ADDRESS_LENGTH);
+        readyCount = 10;
+      } else if (req.pair.status == PAIR_STATUS_PAIRED) {
         PRINTLN(F("NRF24: Paired"));
-
         rf24.stopListening();
         configure(&address, NRF24_DEFAULT_CHANNEL);
         return true;
       }
+    } else {
+      delay(50);
+    }
+    if (readyCount) {
+      readyCount--;
+      PRINTLN("NRF24: Sending pair ready response");
+      rf24.writeAckPayload(1, &resp, sizeof(ResponsePacket));
+      delay(5);
     }
   };
 
   PRINTLN(F("NRF24: Not paired"));
   return false;
 }
+
+bool NRF24Receiver::isPaired() {
+  return true;
+}
+
 // vim:ai:sw=2:et
