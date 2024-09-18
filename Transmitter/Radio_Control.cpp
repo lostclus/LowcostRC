@@ -8,10 +8,22 @@ RadioControl::RadioControl(Buzzer *buzzer) : radio(NULL), buzzer(buzzer) {
 void RadioControl::begin() {
   radio = NULL;
 #ifdef WITH_RADIO_NRF24
-  if (!radio && nrf24Radio.begin()) radio = &nrf24Radio;
+  if (!radio) {
+    radio = new NRF24RadioModule();
+    if (!radio->begin()) {
+      delete radio;
+      radio = NULL;
+    }
+  }
 #endif
 #ifdef WITH_RADIO_SPI
-  if (!radio && spiRadio.begin()) radio = &spiRadio;
+  if (!radio) {
+    radio = new SPIRadioModule();
+    if (!radio->begin()) {
+      delete radio;
+      radio = NULL;
+    }
+  }
 #endif
 }
 
@@ -19,6 +31,13 @@ void RadioControl::sendRFChannel(RFChannel channel) {
   union RequestPacket rp;
   rp.rfChannel.packetType = PACKET_TYPE_SET_RF_CHANNEL;
   rp.rfChannel.rfChannel = channel;
+  sendPacket(&rp);
+}
+
+void RadioControl::sendPALevel(PALevel level) {
+  union RequestPacket rp;
+  rp.paLevel.packetType = PACKET_TYPE_SET_PA_LEVEL;
+  rp.paLevel.paLevel = level;
   sendPacket(&rp);
 }
 

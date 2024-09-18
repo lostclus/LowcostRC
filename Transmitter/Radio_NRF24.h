@@ -11,8 +11,12 @@ class NRF24RadioModule : public BaseRadioModule {
   public:
     NRF24RadioModule();
     virtual bool begin();
+    virtual TxModuleType getModuleType();
+    virtual int getNumRFChannels();
+    virtual int getNumPALevels();
     virtual bool setPeer(const Address *addr);
     virtual bool setRFChannel(RFChannel ch);
+    virtual bool setPALevel(PALevel level);
     virtual bool receive(union ResponsePacket *telemetry);
     virtual bool send(const union RequestPacket *packet);
     virtual bool pair();

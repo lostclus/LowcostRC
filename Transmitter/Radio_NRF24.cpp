@@ -4,7 +4,12 @@
 #include "Config.h"
 #include "Radio_NRF24.h"
 
+// Phisical channels are 1..125
+// 0 is alias to the default channel, eg 76
+#define NRF24_NUM_RF_CHANNELS (125 + 1)
 #define NRF24_DEFAULT_CHANNEL 76
+
+#define NRF24_NUM_PA_LEVELS (RF24_PA_MAX-RF24_PA_MIN+1)
 
 NRF24RadioModule::NRF24RadioModule()
   : rf24(RADIO_NRF24_CE_PIN, RADIO_NRF24_CSN_PIN)
@@ -18,15 +23,29 @@ bool NRF24RadioModule::begin() {
   }
 
   PRINTLN(F("NRF24: init: OK"));
-  rf24.setRadiation(RF24_PA_MAX, RF24_250KBPS);
+  rf24.setRadiation(RF24_PA_MIN, RF24_250KBPS);
   rf24.setPayloadSize(PACKET_SIZE);
   rf24.enableAckPayload();
   rf24.setRetries(5, 3);
   return true;
 }
 
+TxModuleType NRF24RadioModule::getModuleType() {
+  return MODULE_TYPE_NRF24L01;
+}
+
+int NRF24RadioModule::getNumRFChannels() {
+  return NRF24_NUM_RF_CHANNELS;
+}
+
+int NRF24RadioModule::getNumPALevels() {
+  return NRF24_NUM_PA_LEVELS;
+}
+
 uint8_t NRF24RadioModule::rfChannelToNRF24(RFChannel ch) {
-  return (ch == 0) ? NRF24_DEFAULT_CHANNEL : ch;
+  if (ch == DEFAULT_RF_CHANNEL)
+    return NRF24_DEFAULT_CHANNEL;
+  return ch;
 }
 
 bool NRF24RadioModule::setPeer(const Address *addr) {
@@ -44,6 +63,14 @@ bool NRF24RadioModule::setRFChannel(RFChannel ch) {
   PRINTLN(rfChannel);
   PRINT(F("NRF24: NRF24 channel: "));
   PRINTLN(rfChannelToNRF24(rfChannel));
+  return true;
+}
+
+bool NRF24RadioModule::setPALevel(PALevel level) {
+  level = constrain(level, 0, NRF24_NUM_PA_LEVELS - 1);
+  rf24.setPALevel(level);
+  PRINT(F("NRF24: PA level: "));
+  PRINTLN(level);
   return true;
 }
 

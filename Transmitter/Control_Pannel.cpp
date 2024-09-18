@@ -20,6 +20,7 @@ const Screen radioMenu[] = {
   SCREEN_BIND_PEER,
   SCREEN_PEER_ADDR,
   SCREEN_RF_CHANNEL,
+  SCREEN_PA_LEVEL,
   SCREEN_MENU_UP,
   SCREEN_NULL
 };
@@ -221,6 +222,13 @@ void ControlPannel::redrawScreen() {
         text,
         PSTR("RF channel\n%d"),
         settings->values.rfChannel
+      );
+      break;
+    case SCREEN_PA_LEVEL:
+      sprintf_P(
+        text,
+        PSTR("PA level\n%d"),
+        settings->values.paLevel + 1
       );
       break;
     case SCREEN_AUTO_CENTER:
@@ -583,10 +591,17 @@ void ControlPannel::handle() {
         break;
       case SCREEN_RF_CHANNEL:
         addWithConstrain(
-          settings->values.rfChannel, change, 0, 125
+          settings->values.rfChannel, change, 0, radioControl->radio->getNumRFChannels() - 1
         );
         radioControl->sendRFChannel(settings->values.rfChannel);
         radioControl->radio->setRFChannel(settings->values.rfChannel);
+        break;
+      case SCREEN_PA_LEVEL:
+        addWithConstrain(
+          settings->values.paLevel, change, 0, radioControl->radio->getNumPALevels() - 1
+        );
+        radioControl->sendPALevel(settings->values.paLevel);
+        radioControl->radio->setPALevel(settings->values.paLevel);
         break;
       case SCREEN_AUTO_CENTER:
         if (change > 0) {

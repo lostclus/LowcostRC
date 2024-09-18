@@ -10,12 +10,6 @@
 
 class RadioControl {
   private:
-#ifdef WITH_RADIO_NRF24
-    NRF24RadioModule nrf24Radio;
-#endif
-#ifdef WITH_RADIO_SPI
-    SPIRadioModule spiRadio;
-#endif
     Buzzer *buzzer;
     byte packetsFailureCount = 0,
         packetsCount = 0,
@@ -31,6 +25,7 @@ class RadioControl {
     RadioControl(Buzzer *buzzer);
     void begin();
     void sendRFChannel(RFChannel channel);
+    void sendPALevel(PALevel level);
     void sendCommand(Command command);
     void sendPacket(const union RequestPacket *packet);
     void handle();

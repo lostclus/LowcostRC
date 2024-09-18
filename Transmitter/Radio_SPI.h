@@ -6,6 +6,10 @@
 
 class SPIRadioModule : public BaseRadioModule {
   private:
+    TxModuleType moduleType;
+    uint8_t numRFChannels,
+            numPALevels;
+
     void pulseSS();
     uint32_t readStatus();
     void writeStatus(uint32_t status);
@@ -16,8 +20,12 @@ class SPIRadioModule : public BaseRadioModule {
   public:
     SPIRadioModule();
     virtual bool begin();
+    virtual TxModuleType getModuleType();
+    virtual int getNumRFChannels();
+    virtual int getNumPALevels();
     virtual bool setPeer(const Address *addr);
     virtual bool setRFChannel(RFChannel ch);
+    virtual bool setPALevel(PALevel level);
     virtual bool receive(union ResponsePacket *packet);
     virtual bool send(const union RequestPacket *packet);
     virtual bool pair();

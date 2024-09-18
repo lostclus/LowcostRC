@@ -9,13 +9,15 @@ const size_t PACKET_SIZE = 18;
 #define ADDRESS_NONE {{0, 0, 0, 0, 0, 0}}
 #define ADDRESS_BROADCAST {{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}}
 #define DEFAULT_RF_CHANNEL 0
+#define DEFAULT_PA_LEVEL 0
 
 enum PacketTypeEnum {
   PACKET_TYPE_CONTROL = 0x0a01,
   PACKET_TYPE_TELEMETRY = 0x0a02,
   PACKET_TYPE_SET_RF_CHANNEL = 0x0a03,
-  PACKET_TYPE_COMMAND = 0x0a04,
+  PACKET_TYPE_SET_PA_LEVEL = 0x0a04,
   PACKET_TYPE_PAIR = 0x0a05,
+  PACKET_TYPE_COMMAND = 0x0a06,
 };
 
 typedef uint16_t PacketType;
@@ -56,6 +58,7 @@ struct Address {
 } __attribute__((__packed__));
 
 typedef uint8_t RFChannel;
+typedef uint8_t PALevel;
 
 struct GenericPacket {
   PacketType packetType;
@@ -76,6 +79,11 @@ struct SetRFChannelPacket {
   RFChannel rfChannel;
 } __attribute__((__packed__));
 
+struct SetPALevelPacket {
+  PacketType packetType;
+  PALevel paLevel;
+} __attribute__((__packed__));
+
 struct CommandPacket {
   PacketType packetType;
   Command command;
@@ -92,6 +100,7 @@ union RequestPacket {
   struct GenericPacket generic;
   struct ControlPacket control;
   struct SetRFChannelPacket rfChannel;
+  struct SetPALevelPacket paLevel;
   struct CommandPacket command;
   struct PairPacket pair;
 };

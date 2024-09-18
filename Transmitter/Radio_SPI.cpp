@@ -60,12 +60,15 @@ void SPIRadioModule::writeData(uint8_t *data, size_t len) {
 
 bool SPIRadioModule::begin() {
   uint32_t newStatus;
+  SPIResponsePacket resp;
 
   pinMode(SS_PIN, OUTPUT);
   SPI.begin();
 
+
   for (int i = 0; i < INIT_RETRY_COUNT; i++) {
     writeStatus(SPI_STATUS_STARTING);
+
     for (
         unsigned long start = millis();
         millis() - start < INIT_TIMEOUT;
@@ -79,12 +82,39 @@ bool SPIRadioModule::begin() {
   }
 
   if (newStatus != SPI_STATUS_OK) {
-    PRINTLN(F("SPI: Init: FAIL"));
+    PRINTLN(F("SPI: Init: status check FAIL"));
     PRINTLN(newStatus);
     return false;
   }
+
+  if (!receiveGeneric(&resp, sizeof(SPIResponsePacket), SPI_STATUS_OK)) {
+    PRINTLN(F("SPI: Init: read response FAIL"));
+    return false;
+  }
+
+  if (resp.init.packetType != SPI_PACKET_TYPE_INIT) {
+    PRINTLN(F("SPI: Init: response type FAIL"));
+    return false;
+  }
+
+  moduleType = resp.init.moduleType;
+  numRFChannels = resp.init.numRFChannels;
+  numPALevels = resp.init.numPALevels;
+
   PRINTLN(F("SPI: Init: OK"));
   return true;
+}
+
+TxModuleType::SPIRadioModule::getModuleType() {
+  return moduleType;
+}
+
+int SPIRadioModule::getNumRFChannels() {
+  return numRFChannels;
+}
+
+int SPIRadioModule::getNumPALevels() {
+  return numPALevels;
 }
 
 bool SPIRadioModule::setPeer(const Address *addr) {
@@ -108,6 +138,20 @@ bool SPIRadioModule::setRFChannel(RFChannel ch) {
 
   if (sendGeneric(&req, sizeof(SPIRequestPacket), SPI_STATUS_SET_CHANNEL)) {
     rfChannel = ch;
+    return true;
+  }
+  return false;
+}
+
+bool SPIRadioModule::setPALevel(PALevel level) {
+  SPIRequestPacket req;
+
+  level = constrain(level, 0, numPALevels - 1);
+
+  req.paLevel.packetType = SPI_PACKET_TYPE_SET_PA_LEVEL;
+  req.paLevel.paLevel = level;
+
+  if (sendGeneric(&req, sizeof(SPIRequestPacket), SPI_STATUS_SET_PA_LEVEL)) {
     return true;
   }
   return false;

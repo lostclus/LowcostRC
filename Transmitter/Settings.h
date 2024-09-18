@@ -13,22 +13,23 @@ struct AxisSettings {
   uint16_t dualRate;
   int16_t trimming;
   ChannelN channel;
-};
+} __attribute__((__packed__));
 
 struct SwitchesSettings {
   uint16_t low, high;
   ChannelN channel;
-};
+} __attribute__((__packed__));
 
 struct SettingsValues {
   uint16_t magick;
   char profileName[8];
   Address peer;
   RFChannel rfChannel;
+  PALevel paLevel;
   uint16_t battaryLowMV;
   AxisSettings axes[AXES_COUNT];
   SwitchesSettings switches[SWITCHES_COUNT];
-};
+} __attribute__((__packed__));
 
 class Settings {
   public:

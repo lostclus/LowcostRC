@@ -5,10 +5,13 @@
 
 #include <LowcostRC_Protocol.h>
 #include <LowcostRC_SPI.h>
+#include <LowcostRC_Tx.h>
 #include <LowcostRC_Console.h>
 
 #define ESP_OK 0
 #define RANDOM_SEED_PIN A0
+#define ESP8266_DEFAULT_CHANNEL 11
+#define ESP8266_NUM_CHANNELS 12
 
 Address peer = ADDRESS_NONE;
 RFChannel rfChannel = DEFAULT_RF_CHANNEL;
@@ -22,13 +25,21 @@ int blinkDuration = 0,
     blinkCount = 0;
 
 uint8_t rfChannelToWifi(RFChannel ch) {
-  uint8_t wch = ch % 11;
-  return wch == 0 ? 11 : wch;
+  if (ch == DEFAULT_RF_CHANNEL)
+    return ESP8266_DEFAULT_CHANNEL;
+  return ch;
 }
 
 void onSPIStatus(uint32_t status) {
+  SPIResponsePacket resp;
+
   if (status == SPI_STATUS_STARTING) {
     PRINTLN("Starting");
+    resp.init.packetType = SPI_PACKET_TYPE_INIT;
+    resp.init.moduleType = MODULE_TYPE_ESP8266;
+    resp.init.numRFChannels = ESP8266_NUM_CHANNELS;
+    resp.init.numPALevels = 1;
+    SPISlave.setData((uint8_t*)&resp, sizeof(ResponsePacket));
     SPISlave.setStatus(SPI_STATUS_OK);
   }
   else if (status == SPI_STATUS_PAIRING) {
@@ -59,7 +70,7 @@ void onSPIDataRecv(uint8_t *data, size_t len) {
     memcpy(peer.address, req.peerAddr.peer.address, ADDRESS_LENGTH);
     if (!esp_now_is_peer_exist(peer.address)) {
       esp_now_add_peer(
-	peer.address, ESP_NOW_ROLE_COMBO, rfChannelToWifi(rfChannel), NULL, 0
+        peer.address, ESP_NOW_ROLE_COMBO, rfChannelToWifi(rfChannel), NULL, 0
       );
     }
     SPISlave.setStatus(SPI_STATUS_OK);
@@ -69,6 +80,10 @@ void onSPIDataRecv(uint8_t *data, size_t len) {
     PRINTLN(req.rfChannel.rfChannel);
     rfChannel = req.rfChannel.rfChannel;
     esp_now_set_peer_channel(peer.address, rfChannelToWifi(rfChannel));
+    SPISlave.setStatus(SPI_STATUS_OK);
+  } else if (req.rfChannel.packetType == SPI_PACKET_TYPE_SET_PA_LEVEL) {
+    // TODO: do research if PA level can be adjested on ESP8266 for ESP-NOW
+    // packets
     SPISlave.setStatus(SPI_STATUS_OK);
   } else {
     if (

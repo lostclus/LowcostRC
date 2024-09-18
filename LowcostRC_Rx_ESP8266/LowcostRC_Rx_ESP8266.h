@@ -25,6 +25,7 @@ class ESP8266Receiver : public BaseReceiver {
     virtual const Address *getPeerAddress();
     virtual RFChannel getRFChannel();
     virtual void setRFChannel(RFChannel ch);
+    virtual void setPALevel(PALevel level);
     virtual bool receive(RequestPacket *packet);
     virtual void send(const ResponsePacket *packet);
     virtual bool pair();

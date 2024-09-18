@@ -13,12 +13,13 @@
 #define RANDOM_SEED_PIN A1
 
 #define SETTINGS_ADDR 0
-#define SETTINGS_MAGICK 0x1234
+#define SETTINGS_MAGICK 0x1235
 
 struct Settings {
   uint16_t magick;
   Address address;
   RFChannel rfChannel;
+  PALevel paLevel;
   ControlPacket failsafe;
 } settings;
 
@@ -26,6 +27,7 @@ const Settings defaultSettings PROGMEM = {
   SETTINGS_MAGICK,
   ADDRESS_NONE,
   DEFAULT_RF_CHANNEL,
+  DEFAULT_PA_LEVEL,
   {
     PACKET_TYPE_CONTROL,
     {
@@ -91,6 +93,7 @@ void setup(void) {
   }
 
   receiver.begin(&settings.address, settings.rfChannel);
+  receiver.setPALevel(settings.paLevel);
 
   controlTime = 0;
   sendTelemetryTime = 0;
@@ -145,6 +148,12 @@ void loop(void) {
       PRINTLN(rp.rfChannel.rfChannel);
       receiver.setRFChannel(rp.rfChannel.rfChannel);
       settings.rfChannel = rp.rfChannel.rfChannel;
+      EEPROM.put(SETTINGS_ADDR, settings);
+    } else if (rp.generic.packetType == PACKET_TYPE_SET_PA_LEVEL) {
+      PRINT(F("New PA level: "));
+      PRINTLN(rp.paLevel.paLevel);
+      receiver.setPALevel(rp.paLevel.paLevel);
+      settings.paLevel = rp.paLevel.paLevel;
       EEPROM.put(SETTINGS_ADDR, settings);
     } else if (rp.generic.packetType == PACKET_TYPE_COMMAND) {
       if (rp.command.command == COMMAND_SAVE_FAILSAFE && hasLastChannels) {

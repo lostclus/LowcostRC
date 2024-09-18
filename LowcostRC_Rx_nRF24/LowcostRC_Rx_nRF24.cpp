@@ -8,7 +8,9 @@ NRF24Receiver::NRF24Receiver(uint8_t cepin, uint8_t cspin)
 }
 
 uint8_t NRF24Receiver::rfChannelToNRF24(RFChannel ch) {
-  return (ch == 0) ? NRF24_DEFAULT_CHANNEL : ch;
+  if (ch == DEFAULT_RF_CHANNEL)
+    return NRF24_DEFAULT_CHANNEL;
+  return ch;
 }
 
 void NRF24Receiver::configure(const Address *addr, RFChannel ch) {
@@ -17,7 +19,7 @@ void NRF24Receiver::configure(const Address *addr, RFChannel ch) {
 #endif
 
   rf24.closeReadingPipe(1);
-  rf24.setRadiation(RF24_PA_MAX, RF24_250KBPS);
+  rf24.setRadiation(RF24_PA_MIN, RF24_250KBPS);
   rf24.setPayloadSize(PACKET_SIZE);
   rf24.enableAckPayload();
   rf24.openReadingPipe(1, addr->address);
@@ -79,6 +81,13 @@ void NRF24Receiver::setRFChannel(RFChannel ch) {
   PRINTLN(rfChannelToNRF24(ch));
 }
 
+void NRF24Receiver::setPALevel(PALevel level) {
+  level = constrain(level, RF24_PA_MIN, RF24_PA_MAX);
+  rf24.setPALevel(level);
+  PRINT(F("PA level: "));
+  PRINTLN(level);
+}
+
 bool NRF24Receiver::receive(RequestPacket *packet) {
   if (!rf24.available()) return false;
   rf24.read(packet, sizeof(RequestPacket));
@@ -97,7 +106,7 @@ bool NRF24Receiver::pair() {
 
   PRINTLN(F("NRF24: Starting pairing"));
   rf24.stopListening();
-  configure(&broadcast, NRF24_DEFAULT_CHANNEL);
+  configure(&broadcast, DEFAULT_RF_CHANNEL);
 
   for (
     unsigned long start = millis();
@@ -124,7 +133,7 @@ bool NRF24Receiver::pair() {
       } else if (req.pair.status == PAIR_STATUS_PAIRED) {
         PRINTLN(F("NRF24: Paired"));
         rf24.stopListening();
-        configure(&address, NRF24_DEFAULT_CHANNEL);
+        configure(&address, DEFAULT_RF_CHANNEL);
         return true;
       }
     } else {

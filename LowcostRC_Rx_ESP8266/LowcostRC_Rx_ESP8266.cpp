@@ -5,6 +5,7 @@
 #include <LowcostRC_Console.h>
 
 #define ESP_OK 0
+#define DEFAULT_WIFI_CHANNEL 11
 
 static ESP8266Receiver *receiver = NULL;
 
@@ -29,8 +30,9 @@ ESP8266Receiver::ESP8266Receiver()
 }
 
 uint8_t ESP8266Receiver::rfChannelToWifi(RFChannel ch) {
-  uint8_t wch = ch % 11;
-  return wch == 0 ? 11 : wch;
+  if (ch == DEFAULT_RF_CHANNEL)
+    return DEFAULT_WIFI_CHANNEL;
+  return ch;
 }
 
 void ESP8266Receiver::ensurePeerExist(uint8_t *mac, uint8_t wifiChannel) {
@@ -118,6 +120,9 @@ RFChannel ESP8266Receiver::getRFChannel() {
 void ESP8266Receiver::setRFChannel(RFChannel ch) {
   rfChannel = ch;
   esp_now_set_peer_channel(peer.address, rfChannelToWifi(rfChannel));
+}
+
+void ESP8266Receiver::setPALevel(PALevel level) {
 }
 
 bool ESP8266Receiver::receive(RequestPacket *packet) {

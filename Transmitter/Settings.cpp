@@ -4,7 +4,7 @@
 #include <LowcostRC_Console.h>
 #include "Settings.h"
 
-#define SETTINGS_MAGICK 0x555a
+#define SETTINGS_MAGICK 0x555b
 #define PROFILES_ADDR 0
 #define SETTINGS_SIZE sizeof(SettingsValues)
 
@@ -22,6 +22,7 @@ const SettingsValues defaultSettingsValues PROGMEM = {
   {0, 0, 0, 0, 0, 0, 0, 0},
   ADDRESS_NONE,
   DEFAULT_RF_CHANNEL,
+  DEFAULT_PA_LEVEL,
   DEFAULT_BATTARY_LOW_MV,
   // axes
   {

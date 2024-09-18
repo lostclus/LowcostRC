@@ -17,11 +17,12 @@ Receiver can be build using Arduino + NRF24L01 or a single ESP8266.
 
 ## Transmitter features
  
-- 8 channels
+- 8 control channels
 - Pluggable radio modules (NRF24L01 or ESP8266)
 - User interface with monochrome display and 3 buttons
 - Multiple profiles (models) can be stored in EEPROM
-- Various parameters can be changed like channels mapping, trimming, double rate, etc
+- Using UI it is possible to change various control and radio link parameters
+  like channels mapping, trimming, double rate, radio channel, radio power, etc
 
 ## Directory structure
 

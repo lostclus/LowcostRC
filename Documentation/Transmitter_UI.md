@@ -3,18 +3,21 @@
 
 There are 3 buttons to interact with the user interface.
 
-Screen button:
-Go to the next screen
+Screen button short press
+: Go to the next screen
 
-Plus button:
-Increase parameter value or confirm operation.
+Screen button long press
+: Go to the blank screen
 
-Minus button:
-Decrease parameter value or cancel operation.
+Plus button
+: Increase parameter value or confirm operation
+
+Minus button
+: Decrease parameter value or cancel operation
 
 ## Screens
 
-Blank screen
+Blank screen (default)
 : Nothing displayed. Pressing the plus button will transmit user command 1.
 Pressing the minus button will transmit user command 2.
 
@@ -36,7 +39,13 @@ Radio / peer
 : Display/edit peer address
 
 Radio / RF channel
-: Set radio channel [0..125]
+: Set radio channel. For NRF24L01 value range is [0..125]. For ESP8266 range is
+[0..11]. The `0` value means default channel (76 for NRF24L01 and 11 for
+ESP8266)
+
+Radio / PA level
+: Set power amplifier level. For NRF24L01 value range is [1..4]. For ESP8266
+there is only 1 PA level
 
 Controls / J centers
 : Set joysticks center
@@ -72,3 +81,14 @@ detected by receiver)
 
 Save?
 : Pressing the plus button will save settings of current profile in EEPROM
+
+## Buzzer signals
+
+1 very short high pitch signal
+: Low link quality alert
+
+1 short low pitch signal
+: Link quality returned to normal
+
+3 long low pitch signals
+: Low battery alert

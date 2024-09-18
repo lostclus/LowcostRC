@@ -9,6 +9,7 @@ class BaseReceiver {
     virtual const Address *getPeerAddress() = 0; // remote device (Tx) address
     virtual RFChannel getRFChannel() = 0;
     virtual void setRFChannel(RFChannel ch) = 0;
+    virtual void setPALevel(PALevel level) = 0;
     virtual bool receive(RequestPacket *packet) = 0;
     virtual void send(const ResponsePacket *packet) = 0;
     virtual bool pair() = 0;
