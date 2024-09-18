@@ -1,11 +1,11 @@
 #include <Arduino.h>
 #include "Config.h"
-#include "Battary.h"
+#include "Battery.h"
 
 unsigned long vHist[5] = {0, 0, 0, 0, 0};
 uint8_t vHistPos = 0;
 
-unsigned int getBattaryVoltage() {
+unsigned int getBatteryVoltage() {
   uint8_t i, count = 0;
   unsigned long vcc = 0, vpin, vsum = 0;
    

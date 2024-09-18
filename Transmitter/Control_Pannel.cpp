@@ -1,5 +1,5 @@
 #include <LowcostRC_Console.h>
-#include "Battary.h"
+#include "Battery.h"
 #include "Settings.h"
 #include "Control_Pannel.h"
 
@@ -64,7 +64,7 @@ const Screen mappingMenu[] = {
 };
 
 const Screen peerMenu[] = {
-  SCREEN_BATTARY_LOW,
+  SCREEN_BATTERY_LOW,
   SCREEN_SAVE_FAILSAFE,
   SCREEN_MENU_UP,
   SCREEN_NULL
@@ -163,8 +163,8 @@ void ControlPannel::redrawScreen() {
              "LQI: %d%%"),
         settings->currentProfile + 1,
         settings->values.profileName,
-        thisBattaryMV / 1000,
-        (thisBattaryMV % 1000) / 10,
+        thisBatteryMV / 1000,
+        (thisBatteryMV % 1000) / 10,
         radioControl->telemetry.battaryMV / 1000,
         (radioControl->telemetry.battaryMV % 1000) / 10,
         radioControl->linkQuality
@@ -333,7 +333,7 @@ void ControlPannel::redrawScreen() {
         );
       }
       break;
-    case SCREEN_BATTARY_LOW:
+    case SCREEN_BATTERY_LOW:
       sprintf_P(
         text,
         PSTR("Bat low\n%d.%03dV"),
@@ -674,7 +674,7 @@ void ControlPannel::handle() {
           NUM_CHANNELS - 1
         );
         break;
-      case SCREEN_BATTARY_LOW:
+      case SCREEN_BATTERY_LOW:
         addWithConstrain(
           settings->values.battaryLowMV,
           change * 100,
@@ -745,11 +745,11 @@ void ControlPannel::handle() {
       if (cursor != 0) cursor = 0;
   }
 
-  if (now - battaryUpdateTime > BATTARY_MONITOR_INTERVAL) {
+  if (now - battaryUpdateTime > BATTERY_MONITOR_INTERVAL) {
     battaryUpdateTime = now;
-    thisBattaryMV = getBattaryVoltage();
-    PRINT(F("This device battary (mV): "));
-    PRINTLN(thisBattaryMV);
+    thisBatteryMV = getBatteryVoltage();
+    PRINT(F("This device battery (mV): "));
+    PRINTLN(thisBatteryMV);
     if (
       radioControl->telemetry.battaryMV > 0
       && radioControl->telemetry.battaryMV < settings->values.battaryLowMV

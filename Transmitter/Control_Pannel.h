@@ -69,7 +69,7 @@ enum ScreenEnum {
   SCREEN_CHANNEL_SWITCH_4,
 
   // Peer
-  SCREEN_BATTARY_LOW,
+  SCREEN_BATTERY_LOW,
   SCREEN_SAVE_FAILSAFE,
 
   SCREEN_SAVE,
@@ -115,7 +115,7 @@ class ControlPannel {
     unsigned long battaryUpdateTime = 0,
                   settingsChangeTime = 0,
                   redrawTime = 0;
-    unsigned int thisBattaryMV = 0;
+    unsigned int thisBatteryMV = 0;
     uint8_t flags = 0,
             cursor = 0;
 
