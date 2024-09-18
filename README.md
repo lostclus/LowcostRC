@@ -21,7 +21,7 @@ Receiver can be build using Arduino + NRF24L01 or a single ESP8266.
 - Pluggable radio modules (NRF24L01 or ESP8266)
 - User interface with monochrome display and 3 buttons
 - Multiple profiles (models) can be stored in EEPROM
-- Using UI it is possible to change various control and radio link parameters
+- Using UI it's possible to change various control and radio link parameters
   like channels mapping, trimming, double rate, radio channel, radio power, etc
 
 ## Directory structure
@@ -49,7 +49,7 @@ Receiver can be build using Arduino + NRF24L01 or a single ESP8266.
 
 `Receiver_Sim`
 : Sample receiver sketch to use with flight simulator on PC. Based on Arduino
-Micro and NRF24L01. Arduino connects to PC using USB cable and recognized as
+Pro Micro and NRF24L01. Arduino connects to PC using USB cable and recognized as
 gamepad device with 8 axis.
 
 `Documentation/Schematics`
