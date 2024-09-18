@@ -9,16 +9,16 @@ LowcostRC is low price remote control system based on Arduino.
 The following main components are used for the transmitter:
 
 - Arduino Pro Mini as main MCU
-- NRF24L01 or ESP8266 as radio module
+- nRF24L01 or ESP8266 as radio module
 - 0.96" SSD1306 OLED Display
 - Two 2-axis joysticks
 
-Receiver can be build using Arduino + NRF24L01 or a single ESP8266.
+Receiver can be build using Arduino + nRF24L01 or a single ESP8266.
 
 ## Transmitter features
  
 - 8 control channels
-- Pluggable radio modules (NRF24L01 or ESP8266)
+- Pluggable radio modules (nRF24L01 or ESP8266)
 - User interface with monochrome display and 3 buttons
 - Multiple profiles (models) can be stored in EEPROM
 - Using UI it's possible to change various control and radio link parameters
@@ -33,23 +33,23 @@ Receiver can be build using Arduino + NRF24L01 or a single ESP8266.
 : ESP8266 receiver library
 
 `LowcostRC_Rx_nRF24`
-: NRF24L01 receiver library
+: nRF24L01 receiver library
 
 `Transmitter`
 : Transmitter code
 
 `Receiver_1S`
-: Sample receiver sketch for plane. 1S power, NRF24L01 radio, brushed motor.
+: Sample receiver sketch for plane. 1S power, nRF24L01 radio, brushed motor.
 
 `Receiver_2S`
-: Sample receiver sketch for plane. 2S power, NRF24L01 radio, brushless motor.
+: Sample receiver sketch for plane. 2S power, nRF24L01 radio, brushless motor.
 
 `Receiver_ESP8266`
 : Sample receiver sketch for plane. 1S power, ESP8266 radio, brushed motor.
 
 `Receiver_Sim`
 : Sample receiver sketch to use with flight simulator on PC. Based on Arduino
-Pro Micro and NRF24L01. Arduino connects to PC using USB cable and recognized as
+Pro Micro and nRF24L01. Arduino connects to PC using USB cable and recognized as
 gamepad device with 8 axis.
 
 `Documentation/Schematics`

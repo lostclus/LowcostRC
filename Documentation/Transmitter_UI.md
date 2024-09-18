@@ -39,12 +39,12 @@ Radio / peer
 : Display/edit peer address
 
 Radio / RF channel
-: Set radio channel. For NRF24L01 value range is [0..125]. For ESP8266 range is
-[0..11]. The `0` value means default channel (76 for NRF24L01 and 11 for
+: Set radio channel. For nRF24L01 value range is [0..125]. For ESP8266 range is
+[0..11]. The `0` value means default channel (76 for nRF24L01 and 11 for
 ESP8266)
 
 Radio / PA level
-: Set power amplifier level. For NRF24L01 value range is [1..4]. For ESP8266
+: Set power amplifier level. For nRF24L01 value range is [1..4]. For ESP8266
 there is only 1 PA level
 
 Controls / J centers
