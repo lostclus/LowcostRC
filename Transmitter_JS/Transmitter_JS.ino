@@ -10,8 +10,16 @@
 #define NRF24_CSN_PIN 10
 #define NRF24_DEFAULT_CHANNEL 76
 
+#ifndef NRF24_DATA_RATE
+#define NRF24_DATA_RATE RF24_250KBPS
+#endif
+
+#ifndef NRF24_PA_LEVEL
+#define NRF24_PA_LEVEL RF24_PA_LOW
+#endif
+
 #ifndef PEER_ADDR
-#define PEER_ADDR 0x00,0x00,0x00,0x00,0x00,0x00
+#define PEER_ADDR 0x01,0x01,0x00,0x00,0x00,0x00
 #endif
 
 #ifndef BATTERY_LOW_MV
@@ -135,7 +143,7 @@ void setup(void)
   } else {
     PRINTLN("Radio init: FAILURE");
   }
-  radio.setRadiation(RF24_PA_LOW, RF24_250KBPS);
+  radio.setRadiation(NRF24_PA_LEVEL, NRF24_DATA_RATE);
   radio.setPayloadSize(PACKET_SIZE);
   radio.enableAckPayload();
 
