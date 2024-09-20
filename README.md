@@ -23,6 +23,8 @@ Receiver can be build using Arduino + nRF24L01 or a single ESP8266.
 - Multiple profiles (models) can be stored in EEPROM
 - Using UI it's possible to change various control and radio link parameters
   like channels mapping, trimming, double rate, radio channel, radio power, etc
+- Maximum transmission packet rate is about 270 packets per second on Arduino
+  Pro Mini 3.3v 8MHz and nRF24L01 on both sides
 
 ## Directory structure
 
