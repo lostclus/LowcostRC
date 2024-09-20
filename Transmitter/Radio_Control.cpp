@@ -2,7 +2,7 @@
 #include "Radio_Control.h"
 
 RadioControl::RadioControl(Buzzer *buzzer) : radio(NULL), buzzer(buzzer) {
-  telemetry.battaryMV = 0;
+  telemetry.batteryMV = 0;
 }
 
 void RadioControl::begin() {
@@ -92,8 +92,8 @@ void RadioControl::handle() {
     if (response.telemetry.packetType == PACKET_TYPE_TELEMETRY) {
       memcpy(&telemetry, &response.telemetry, sizeof(TelemetryPacket));
       telemetryTime = now;
-      PRINT(F("Peer device battary (mV): "));
-      PRINTLN(telemetry.battaryMV);
+      PRINT(F("Peer device battery (mV): "));
+      PRINTLN(telemetry.batteryMV);
     }
   }
 }

@@ -71,7 +71,7 @@ struct ControlPacket {
 
 struct TelemetryPacket {
   PacketType packetType;
-  uint16_t battaryMV;
+  uint16_t batteryMV;
 } __attribute__((__packed__));
 
 struct SetRFChannelPacket {

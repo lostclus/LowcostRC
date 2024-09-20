@@ -26,7 +26,7 @@ struct SettingsValues {
   Address peer;
   RFChannel rfChannel;
   PALevel paLevel;
-  uint16_t battaryLowMV;
+  uint16_t batteryLowMV;
   AxisSettings axes[AXES_COUNT];
   SwitchesSettings switches[SWITCHES_COUNT];
 } __attribute__((__packed__));

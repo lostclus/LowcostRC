@@ -8,7 +8,7 @@
 #define PROFILES_ADDR 0
 #define SETTINGS_SIZE sizeof(SettingsValues)
 
-#define DEFAULT_BATTARY_LOW_MV  3400
+#define DEFAULT_BATTERY_LOW_MV  3400
 #define DEFAULT_JOY_CENTER      512
 #define DEFAULT_JOY_THRESHOLD   1
 #define DEFAULT_JOY_INVERT      false
@@ -23,7 +23,7 @@ const SettingsValues defaultSettingsValues PROGMEM = {
   ADDRESS_NONE,
   DEFAULT_RF_CHANNEL,
   DEFAULT_PA_LEVEL,
-  DEFAULT_BATTARY_LOW_MV,
+  DEFAULT_BATTERY_LOW_MV,
   // axes
   {
     {

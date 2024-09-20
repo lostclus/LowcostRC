@@ -199,7 +199,7 @@ void sendTelemetry() {
   ResponsePacket resp;
 
   resp.telemetry.packetType = PACKET_TYPE_TELEMETRY;
-  resp.telemetry.battaryMV = 5000;
+  resp.telemetry.batteryMV = 5000;
 
   receiver.send(&resp);
 }

@@ -167,8 +167,8 @@ void ControlPannel::redrawScreen() {
         settings->values.profileName,
         thisBatteryMV / 1000,
         (thisBatteryMV % 1000) / 10,
-        radioControl->telemetry.battaryMV / 1000,
-        (radioControl->telemetry.battaryMV % 1000) / 10,
+        radioControl->telemetry.batteryMV / 1000,
+        (radioControl->telemetry.batteryMV % 1000) / 10,
         radioControl->linkQuality
       );
       break;
@@ -346,8 +346,8 @@ void ControlPannel::redrawScreen() {
       sprintf_P(
         text,
         PSTR("Bat low\n%d.%03dV"),
-        settings->values.battaryLowMV /1000,
-        settings->values.battaryLowMV % 1000
+        settings->values.batteryLowMV /1000,
+        settings->values.batteryLowMV % 1000
       );
       break;
     case SCREEN_SAVE_FAILSAFE:
@@ -692,7 +692,7 @@ void ControlPannel::handle() {
         break;
       case SCREEN_BATTERY_LOW:
         addWithConstrain(
-          settings->values.battaryLowMV,
+          settings->values.batteryLowMV,
           change * 100,
           100,
           20000
@@ -761,14 +761,14 @@ void ControlPannel::handle() {
       if (cursor != 0) cursor = 0;
   }
 
-  if (now - battaryUpdateTime > BATTERY_MONITOR_INTERVAL) {
-    battaryUpdateTime = now;
+  if (now - batteryUpdateTime > BATTERY_MONITOR_INTERVAL) {
+    batteryUpdateTime = now;
     thisBatteryMV = voltMetter.readMillivolts();
     PRINT(F("This device battery (mV): "));
     PRINTLN(thisBatteryMV);
     if (
-      radioControl->telemetry.battaryMV > 0
-      && radioControl->telemetry.battaryMV < settings->values.battaryLowMV
+      radioControl->telemetry.batteryMV > 0
+      && radioControl->telemetry.batteryMV < settings->values.batteryLowMV
     ) {
       buzzer->beep(BEEP_LOW_HZ, 200, 100, 3);
     }

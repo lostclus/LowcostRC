@@ -171,15 +171,15 @@ void applyControl(ControlPacket *control) {
 }
 
 void sendTelemetry() {
-  unsigned int battaryMV;
+  unsigned int batteryMV;
   ResponsePacket resp;
 
   resp.telemetry.packetType = PACKET_TYPE_TELEMETRY;
 
-  battaryMV = voltMetter.readMillivolts();
-  PRINT(F("battaryMV: "));
-  PRINTLN(battaryMV);
-  resp.telemetry.battaryMV = battaryMV;
+  batteryMV = voltMetter.readMillivolts();
+  PRINT(F("batteryMV: "));
+  PRINTLN(batteryMV);
+  resp.telemetry.batteryMV = batteryMV;
 
   receiver.send(&resp);
 }

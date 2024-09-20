@@ -115,7 +115,7 @@ class ControlPannel {
            plusButton,
            minusButton;
     VoltMetter voltMetter;
-    unsigned long battaryUpdateTime = 0,
+    unsigned long batteryUpdateTime = 0,
                   settingsChangeTime = 0,
                   redrawTime = 0;
     unsigned int thisBatteryMV = 0;

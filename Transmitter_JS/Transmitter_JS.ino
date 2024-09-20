@@ -226,8 +226,8 @@ void controlLoop(unsigned long now) {
     radio.read(&telemetry, sizeof(telemetry));
     if (telemetry.packetType == PACKET_TYPE_TELEMETRY) {
       PRINT(F("batteryMV: "));
-      PRINTLN(telemetry.battaryMV);
-      if (telemetry.battaryMV < BATTERY_LOW_MV) {
+      PRINTLN(telemetry.batteryMV);
+      if (telemetry.batteryMV < BATTERY_LOW_MV) {
         beepCount = 3;
         beepDuration = 200;
         beepPause = 100;
