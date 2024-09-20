@@ -29,6 +29,9 @@ Receiver can be build using Arduino + nRF24L01 or a single ESP8266.
 `LowcostRC_Core`
 : Core library
 
+`LowcostRC_Rx`
+: Core receiver library
+
 `LowcostRC_Rx_ESP8266`
 : ESP8266 receiver library
 

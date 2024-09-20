@@ -1,5 +1,5 @@
 #include <LowcostRC_Console.h>
-#include "Battery.h"
+#include <LowcostRC_VoltMetter.h>
 #include "Settings.h"
 #include "Control_Pannel.h"
 
@@ -112,6 +112,7 @@ ControlPannel::ControlPannel(
   , screenButton(KEY_SCREEN_PIN)
   , plusButton(KEY_PLUS_PIN)
   , minusButton(KEY_MINUS_PIN)
+  , voltMetter(VOLT_METER_PIN, VOLT_METER_R1, VOLT_METER_R2)
 {
   moveMenuTop();
 }
@@ -762,7 +763,7 @@ void ControlPannel::handle() {
 
   if (now - battaryUpdateTime > BATTERY_MONITOR_INTERVAL) {
     battaryUpdateTime = now;
-    thisBatteryMV = getBatteryVoltage();
+    thisBatteryMV = voltMetter.readMillivolts();
     PRINT(F("This device battery (mV): "));
     PRINTLN(thisBatteryMV);
     if (

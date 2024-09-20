@@ -1,14 +1,19 @@
 #include <Arduino.h>
-#include "Config.h"
-#include "Battery.h"
+#include <LowcostRC_Console.h>
+#include <LowcostRC_VoltMetter.h>
 
-unsigned long vHist[5] = {0, 0, 0, 0, 0};
-uint8_t vHistPos = 0;
+VoltMetter::VoltMetter(int pin, int r1, int r2)
+  : pin(pin),
+    r1(r1),
+    r2(r2)
+{
+}
 
-unsigned int getBatteryVoltage() {
-  uint8_t i, count = 0;
+unsigned int VoltMetter::readMillivolts() {
+  byte i, count = 0;
   unsigned long vcc = 0, vpin, vsum = 0;
    
+#ifdef ARDUINO_ARCH_AVR
   // Read 1.1V reference against AVcc
   // set the reference to Vcc and the measurement to the internal 1.1V reference
   #if defined(__AVR_ATmega32U4__) || defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
@@ -31,7 +36,18 @@ unsigned int getBatteryVoltage() {
 
   // 1.1 * 1023 * 1000 = 1125300
   vcc = 1125300L / ((unsigned long)((high<<8) | low));
-  vpin = analogRead(VOLT_METER_PIN);
+#elif defined(ARDUINO_ARCH_ESP8266)
+  vcc = 1000L;
+#endif
+  vpin = analogRead(pin);
+
+  /*
+  PRINT(F("vcc: "));
+  PRINTLN(vcc);
+
+  PRINT(F("vpin: "));
+  PRINTLN(vpin);
+  */
 
   vHist[vHistPos] = vpin * vcc;
   vHistPos = (vHistPos + 1) % (sizeof(vHist) / sizeof(vHist[0]));
@@ -43,6 +59,7 @@ unsigned int getBatteryVoltage() {
     }
   }
 
-  return (vsum / count) / 1024 
-    * (1000L / (VOLT_METER_R2 * 1000L / (VOLT_METER_R1 + VOLT_METER_R2)));
+  return (vsum / count) / 1024 * (1000L / (r2 * 1000L / (r1 + r2)));
 }
+
+// vim:ai:sw=2:et

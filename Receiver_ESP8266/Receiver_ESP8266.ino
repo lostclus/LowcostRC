@@ -3,6 +3,8 @@
 #include <LowcostRC_Protocol.h>
 #include <LowcostRC_Console.h>
 #include <LowcostRC_Rx_ESP8266.h>
+#include <LowcostRC_Output.h>
+#include <LowcostRC_VoltMetter.h>
 
 #define SETTINGS_ADDR 0
 #define SETTINGS_MAGICK 0x5502
@@ -10,9 +12,6 @@
 #define CHANNEL1_PIN 4
 #define CHANNEL2_PIN 12
 #define CHANNEL3_PIN 14
-
-#define ENGINE_POWER_MIN 1000
-#define ENGINE_POWER_MAX 2000
 
 #define VOLT_METER_PIN A0
 #define VOLT_METER_R1 51100L
@@ -38,13 +37,23 @@ const struct Settings defaultSettings = {
   }
 };
 
-unsigned int battaryMV = 0;
 unsigned long controlTime,
               sendTelemetryTime;
 bool isFailsafe = false;
 
-Servo channel2Servo,
-      channel3Servo;
+PWMDutyCycleOutput channel1Output(CHANNEL1_PIN);
+PWMMicrosecondsOutput channel2Output(CHANNEL2_PIN),
+                      channel3Output(CHANNEL3_PIN);
+
+const int NUM_OUTPUTS = 3;
+BaseOutput *outputs[NUM_OUTPUTS] = {
+  &channel1Output,
+  &channel2Output,
+  &channel3Output
+};
+
+VoltMetter voltMetter(VOLT_METER_PIN, VOLT_METER_R1, VOLT_METER_R2);
+
 ESP8266Receiver receiver;
 
 bool loadSettings() {
@@ -66,60 +75,22 @@ void saveSettings() {
 }
 
 void applyControl(ControlPacket *control) {
-  analogWrite(
-    CHANNEL1_PIN,
-    map(
-      constrain(control->channels[CHANNEL1], ENGINE_POWER_MIN, ENGINE_POWER_MAX),
-      ENGINE_POWER_MIN, ENGINE_POWER_MAX, 0, 255
-    )
-  );
-
-  if (control->channels[CHANNEL2])
-    channel2Servo.writeMicroseconds(control->channels[CHANNEL2]);
-  if (control->channels[CHANNEL3])
-    channel3Servo.writeMicroseconds(control->channels[CHANNEL3]);
+  for (int i = 0; i < NUM_OUTPUTS; i++)
+    outputs[i]->write(control->channels[i]);
 }
 
 void sendTelemetry() {
+  unsigned int battaryMV;
   ResponsePacket resp;
 
   resp.telemetry.packetType = PACKET_TYPE_TELEMETRY;
 
-  updateBattaryVoltage();
+  battaryMV = voltMetter.readMillivolts();
   PRINT(F("battaryMV: "));
   PRINTLN(battaryMV);
   resp.telemetry.battaryMV = battaryMV;
 
   receiver.send(&resp);
-}
-
-void updateBattaryVoltage() {
-  static unsigned long vHist[5] = {0, 0, 0, 0, 0};
-  static byte vHistPos = 0;
-
-  byte i, count = 0;
-  unsigned long vpin, vsum = 0;
-
-  vpin = analogRead(VOLT_METER_PIN);
-
-  PRINT(F("vpin: "));
-  PRINTLN(vpin);
-
-  vHist[vHistPos] = vpin;
-  vHistPos = (vHistPos + 1) % (sizeof(vHist) / sizeof(vHist[0]));
-
-  for (i = 0; i < sizeof(vHist) / sizeof(vHist[0]); i++) {
-    if (vHist[i] > 0) {
-      vsum += vHist[i];
-      count += 1;
-    }
-  }
-
-  battaryMV = map(
-      vsum / count,
-      0, 1023,
-      0, 1000 * (1000L / (VOLT_METER_R2 * 1000L / (VOLT_METER_R1 + VOLT_METER_R2)))
-  );
 }
 
 void setup() {
@@ -131,10 +102,8 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);
 
-  pinMode(CHANNEL1_PIN, OUTPUT);
-  digitalWrite(CHANNEL1_PIN, LOW);
-  channel2Servo.attach(CHANNEL2_PIN);
-  channel3Servo.attach(CHANNEL3_PIN);
+  for (int i = 0; i < NUM_OUTPUTS; i++)
+    outputs[i]->begin();
 
   EEPROM.begin(sizeof(Settings));
   loadSettings();

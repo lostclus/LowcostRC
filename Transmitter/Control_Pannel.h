@@ -15,6 +15,7 @@
 
 #include <AbleButtons.h>
 #include <LowcostRC_Protocol.h>
+#include <LowcostRC_VoltMetter.h>
 #include "Buzzer.h"
 #include "Radio_Control.h"
 #include "Settings.h"
@@ -113,6 +114,7 @@ class ControlPannel {
     Button screenButton,
            plusButton,
            minusButton;
+    VoltMetter voltMetter;
     unsigned long battaryUpdateTime = 0,
                   settingsChangeTime = 0,
                   redrawTime = 0;
