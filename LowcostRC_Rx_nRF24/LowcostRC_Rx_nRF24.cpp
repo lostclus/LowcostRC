@@ -1,6 +1,10 @@
 #include <LowcostRC_Rx_nRF24.h>
 #include <LowcostRC_Console.h>
 
+#ifndef NRF24_DATA_RATE
+#define NRF24_DATA_RATE RF24_250KBPS
+#endif
+
 NRF24Receiver::NRF24Receiver(uint8_t cepin, uint8_t cspin)
   : rf24(cepin, cspin),
     address(ADDRESS_NONE)
@@ -19,7 +23,7 @@ void NRF24Receiver::configure(const Address *addr, RFChannel ch) {
 #endif
 
   rf24.closeReadingPipe(1);
-  rf24.setRadiation(RF24_PA_MIN, RF24_250KBPS);
+  rf24.setRadiation(RF24_PA_MIN, NRF24_DATA_RATE);
   rf24.setPayloadSize(PACKET_SIZE);
   rf24.enableAckPayload();
   rf24.openReadingPipe(1, addr->address);

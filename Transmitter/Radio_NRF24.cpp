@@ -4,6 +4,10 @@
 #include "Config.h"
 #include "Radio_NRF24.h"
 
+#ifndef NRF24_DATA_RATE
+#define NRF24_DATA_RATE RF24_250KBPS
+#endif
+
 // Phisical channels are 1..125
 // 0 is alias to the default channel, eg 76
 #define NRF24_NUM_RF_CHANNELS (125 + 1)
@@ -23,7 +27,7 @@ bool NRF24RadioModule::begin() {
   }
 
   PRINTLN(F("NRF24: init: OK"));
-  rf24.setRadiation(RF24_PA_MIN, RF24_250KBPS);
+  rf24.setRadiation(RF24_PA_MIN, NRF24_DATA_RATE);
   rf24.setPayloadSize(PACKET_SIZE);
   rf24.enableAckPayload();
   rf24.setRetries(5, 3);
