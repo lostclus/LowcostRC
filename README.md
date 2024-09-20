@@ -41,6 +41,9 @@ Receiver can be build using Arduino + nRF24L01 or a single ESP8266.
 `Transmitter`
 : Transmitter code
 
+`Transmitter_JS`
+: Transmitter code adapted for Joystick Shield (no UI, hardcoded parameters)
+
 `Receiver_1S`
 : Sample receiver sketch for plane. 1S power, nRF24L01 radio, brushed motor.
 
