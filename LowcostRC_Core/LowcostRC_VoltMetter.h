@@ -3,12 +3,13 @@
 
 class VoltMetter {
   private:
-    int pin, r1, r2;
+    int pin;
+    unsigned long r1, r2;
     unsigned long vHist[5] = {0, 0, 0, 0, 0};
     byte vHistPos = 0;
 
   public:
-    VoltMetter(int pin, int r1, int r2);
+    VoltMetter(int pin, unsigned long r1, unsigned long r2);
     unsigned int readMillivolts();
 };
 

@@ -2,7 +2,7 @@
 #include <LowcostRC_Console.h>
 #include <LowcostRC_VoltMetter.h>
 
-VoltMetter::VoltMetter(int pin, int r1, int r2)
+VoltMetter::VoltMetter(int pin, unsigned long r1, unsigned long r2)
   : pin(pin),
     r1(r1),
     r2(r2)
