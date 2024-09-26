@@ -5,6 +5,7 @@
 
 class BaseReceiver {
   public:
+    virtual bool begin(const Address *address, RFChannel channel, PALevel level) = 0;
     virtual const Address *getAddress() = 0;     // receiver device (Rx) address
     virtual const Address *getPeerAddress() = 0; // remote device (Tx) address
     virtual RFChannel getRFChannel() = 0;

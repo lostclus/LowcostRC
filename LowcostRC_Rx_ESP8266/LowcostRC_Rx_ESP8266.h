@@ -19,8 +19,7 @@ class ESP8266Receiver : public BaseReceiver {
   public:
 
     ESP8266Receiver();
-    bool begin(const Address *peer, RFChannel ch);
-
+    virtual bool begin(const Address *address, RFChannel channel, PALevel level);
     virtual const Address *getAddress();
     virtual const Address *getPeerAddress();
     virtual RFChannel getRFChannel();

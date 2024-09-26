@@ -19,8 +19,7 @@ class NRF24Receiver : public BaseReceiver {
   public:
 
     NRF24Receiver(uint8_t cepin, uint8_t cspin);
-    bool begin(const Address *addr, RFChannel ch);
-
+    virtual bool begin(const Address *address, RFChannel channel, PALevel level);
     virtual const Address *getAddress();
     virtual const Address *getPeerAddress();
     virtual RFChannel getRFChannel();

@@ -72,7 +72,7 @@ void ESP8266Receiver::_onDataRecv(uint8_t *mac,  uint8_t *incomingData, uint8_t 
   requestTime = millis();
 }
 
-bool ESP8266Receiver::begin(const Address *peerAddr, RFChannel ch) {
+bool ESP8266Receiver::begin(const Address *address, RFChannel channel, PALevel level) {
   Address noneAddr = ADDRESS_NONE;
 
   WiFi.mode(WIFI_STA);
@@ -90,14 +90,14 @@ bool ESP8266Receiver::begin(const Address *peerAddr, RFChannel ch) {
   esp_now_set_self_role(ESP_NOW_ROLE_COMBO);
   esp_now_register_recv_cb(onDataRecv);
 
-  WiFi.macAddress(address.address);
+  WiFi.macAddress(this->address.address);
 
-  memcpy(peer.address, peerAddr->address, ADDRESS_LENGTH);
+  memcpy(peer.address, address->address, ADDRESS_LENGTH);
   _isPaired = memcmp(peer.address, noneAddr.address, ADDRESS_LENGTH) != 0;
 
   if (_isPaired) {
     PRINTLN("ESP: Starting paired");
-    ensurePeerExist(peer.address, rfChannelToWifi(ch));
+    ensurePeerExist(peer.address, rfChannelToWifi(channel));
   } else {
     PRINTLN("ESP: Starting unpaired");
   }

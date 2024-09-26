@@ -1,3 +1,5 @@
+#include <string.h>
+#include <Arduino.h>
 #include <LowcostRC_Rx_nRF24.h>
 #include <LowcostRC_Console.h>
 
@@ -51,17 +53,18 @@ void NRF24Receiver::configure(const Address *addr, RFChannel ch) {
 #endif
 }
 
-bool NRF24Receiver::begin(const Address *addr, RFChannel ch) {
+bool NRF24Receiver::begin(const Address *address, RFChannel channel, PALevel level) {
   if (!rf24.begin()) {
     PRINTLN(F("NRF24: init: FAIL"));
     return false;
   }
   PRINTLN(F("NRF24: init: OK"));
 
-  memcpy(address.address, addr->address, ADDRESS_LENGTH);
-  rfChannel = ch;
+  memcpy(this->address.address, address->address, ADDRESS_LENGTH);
+  rfChannel = channel;
 
-  configure(&address, rfChannel);
+  configure(&this->address, rfChannel);
+  setPALevel(level);
   return true;
 }
 
@@ -107,6 +110,12 @@ bool NRF24Receiver::pair() {
   RequestPacket req;
   ResponsePacket resp;
   int readyCount = 0;
+
+  if (!isPaired()) {
+    randomSeed(millis());
+    for (int i = 0; i < ADDRESS_LENGTH; i++)
+      address.address[i] = random(1 << 8);
+  }
 
   PRINTLN(F("NRF24: Starting pairing"));
   rf24.stopListening();
@@ -156,7 +165,8 @@ bool NRF24Receiver::pair() {
 }
 
 bool NRF24Receiver::isPaired() {
-  return true;
+  Address noneAddr = ADDRESS_NONE;
+  return memcmp(address.address, noneAddr.address, ADDRESS_LENGTH);
 }
 
 // vim:ai:sw=2:et
