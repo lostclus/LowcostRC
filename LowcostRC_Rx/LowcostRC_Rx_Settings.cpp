@@ -26,6 +26,17 @@ void BaseRxSettings::setDefaults() {
   memcpy_P(&values, &defaults, sizeof(SettingsValues));
 }
 
+bool DumbRxSettings::begin() {
+  return true;
+}
+
+bool DumbRxSettings::load() {
+  return false;
+}
+
+void DumbRxSettings::save() {
+}
+
 bool EEPROMRxSettings::begin() {
 #ifdef ARDUINO_ARCH_ESP8266
   EEPROM.begin(sizeof(SettingsValues));

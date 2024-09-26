@@ -25,6 +25,12 @@ class BaseRxSettings {
     void setDefaults();
 };
 
+class DumbRxSettings : public BaseRxSettings {
+    virtual bool begin();
+    virtual bool load();
+    virtual void save();
+};
+
 class EEPROMRxSettings : public BaseRxSettings {
     virtual bool begin();
     virtual bool load();
